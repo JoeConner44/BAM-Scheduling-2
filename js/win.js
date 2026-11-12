@@ -75,7 +75,7 @@ const CUST_FIELDS = [
   { name: 'address', label: 'Site / mailing address', wide: 1 }, { name: 'source', label: 'Lead source' }, { name: 'notes', label: 'Notes', type: 'textarea', wide: 1 }];
 ACT.newCustomer = () => openForm({
   title: 'New customer', fields: CUST_FIELDS, values: { status: 'lead' }, onSubmit(v) {
-    const c = { id: uid('c'), ...v, activity: [{ date: today(), text: 'Added to CRM' }] }; DB.customers.push(c);
+    const c = { id: uid('c'), ...v, portalToken: newToken(), activity: [{ date: today(), text: 'Added to CRM' }] }; DB.customers.push(c);
     if (c.status === 'lead') fire('lead.new', { title: `New lead: ${c.name}`, body: `${c.contact || ''} · ${c.source || 'no source'}`, link: '#/crm' }); save(); render(); toast('Customer added');
   }
 });
@@ -83,7 +83,7 @@ ACT.openCustomer = el => {
   const c = byId('customers', el.dataset.id), es = DB.estimates.filter(e => e.customerId === c.id), js = DB.jobs.filter(j => j.customerId === c.id), is = DB.invoices.filter(i => i.customerId === c.id);
   modal(`<h3>${esc(c.name)} ${badge(c.status)}</h3>
   <div class="two"><div><p><b>${esc(c.contact)}</b><br>${esc(c.phone)} · ${esc(c.email)}<br>${esc(c.address)}<br><small>Source: ${esc(c.source || '—')}</small></p><p class="muted">${esc(c.notes)}</p>
-  <div class="btns"><button class="btn" data-act="editCustomer" data-id="${c.id}">Edit</button><button class="btn primary" data-act="newEstimateFor" data-id="${c.id}">+ Estimate</button><a class="btn" href="#/portal/${c.id}" data-act="closeModal">Customer portal</a><button class="btn danger ghost" data-act="delCustomer" data-id="${c.id}">Delete</button></div></div>
+  <div class="btns"><button class="btn" data-act="editCustomer" data-id="${c.id}">Edit</button><button class="btn primary" data-act="newEstimateFor" data-id="${c.id}">+ Estimate</button><button class="btn" data-act="copyPortal" data-id="${c.id}">🔗 Copy portal link</button><a class="btn" href="#/portal/${c.id}" data-act="closeModal">Preview portal</a><button class="btn ghost" data-act="rotatePortal" data-id="${c.id}">Reset link</button><button class="btn danger ghost" data-act="delCustomer" data-id="${c.id}">Delete</button></div></div>
   <div><h4>Activity</h4><form id="actForm" class="inline"><input name="t" placeholder="Log a call, note, site visit…" required><button class="btn sm">Add</button></form>
   <ul class="timeline">${[...c.activity].reverse().map(a => `<li><em>${fmtD(a.date)}</em> ${esc(a.text)}</li>`).join('')}</ul></div></div>
   <h4>Estimates</h4>${es.length ? `<table>${es.map(e => `<tr><td><a href="#/estimates/${e.id}" data-act="closeModal">#${e.number} ${esc(e.title)}</a></td><td>${badge(e.status)}</td><td>${money(estTotals(e).total)}</td></tr>`).join('')}</table>` : '<p class="muted">None yet</p>'}
@@ -209,7 +209,8 @@ function signEstimate(id, after) {
   $('#sgOk').onclick = () => {
     if (!$('#sgAgree').checked) return toast('Please check the agreement box', 'err');
     if (!pad.isDirty() && !$('#sgName').value.trim()) return toast('Add a signature or typed name', 'err');
-    e.signature = { name: $('#sgName').value || 'Signed', date: today(), img: pad.isDirty() ? pad.data() : null }; e.status = 'signed'; e.signedAt = today();
+    if (PORTAL) { const nm = $('#sgName').value.trim(); if (!nm) return toast('Please type your name', 'err'); $('#sgOk').disabled = true; return portalCall('portal_sign', { p_estimate_id: e.id, p_name: nm, p_img: pad.isDirty() ? pad.data() : '' }).then(ok => { closeModal(); toast(ok ? 'Signed — thank you!' : 'Could not sign (already signed?)', ok ? '' : 'err'); return portalReload(); }, er => { $('#sgOk').disabled = false; toast(er.message, 'err'); }); }
+    e.signature = { name: $('#sgName').value || 'Signed', date: today(), img: pad.isDirty() ? pad.data() : null }; e.status = 'signed'; e.signedAt = today(); e.autoRan = true;
     const c = byId('customers', e.customerId); if (c) { if (c.status !== 'customer') c.status = 'customer'; c.activity.push({ date: today(), text: `Signed proposal #${e.number} — ${e.title}` }); }
     closeModal(); fire('estimate.signed', { estimate: e, title: `Proposal #${e.number} signed — ${money(t.total)}`, body: `${custName(e.customerId)} · ${e.title}`, link: '#/estimates/' + e.id });
     save(); toast('Signed! Automations ran.'); if (after) after(); else render();
@@ -246,3 +247,10 @@ ACT.mapMeasure = el => {
     e.rows.push(row); save(); closeModal(); render(); toast('Added to take-off');
   };
 };
+
+const portalURL = c => location.origin + location.pathname + '#/p/' + c.portalToken;
+ACT.copyPortal = el => {
+  const c = byId('customers', el.dataset.id); if (!c.portalToken) { c.portalToken = newToken(); save(); }
+  navigator.clipboard.writeText(portalURL(c)).then(() => toast(CLOUD ? 'Portal link copied — send it to the customer' : 'Copied (demo mode: only works on this device — set up the backend)'), () => prompt('Copy this link:', portalURL(c)));
+};
+ACT.rotatePortal = el => confirmBox('Create a new private link? The old link stops working immediately.', () => { byId('customers', el.dataset.id).portalToken = newToken(); save(); toast('New link created — copy it again'); });

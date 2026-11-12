@@ -45,7 +45,12 @@ function loadDB() {
   try { DB = JSON.parse(localStorage.getItem(KEY)); } catch (e) { DB = null; }
   if (!DB || DB.v !== 1) { DB = seed(); save(); }
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) { toast('Storage full — export your data from Settings', 'err'); } }
+function save() {
+  if (typeof PORTAL !== 'undefined' && PORTAL) return;           // customers never write directly
+  if (typeof CLOUD !== 'undefined' && CLOUD) return cloudQueue(); // shared backend
+  try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) { toast('Storage full — export your data from Settings', 'err'); }
+}
+const newToken = () => crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
 function resetDemo() { DB = seed(); save(); }
 
 /* ---------- calculations ---------- */
@@ -120,6 +125,15 @@ function makeInvoice(job, onlyBalance) {
   DB.invoices.push(inv); return inv;
 }
 function runChecks() {
+  DB.customers.forEach(c => { if (!c.portalToken) c.portalToken = newToken(); });
+  // proposals signed by customers through the portal: run the same automations as an in-office signature
+  DB.estimates.forEach(e => {
+    if (e.status === 'signed' && e.autoRan === false) {
+      e.autoRan = true; const c = byId('customers', e.customerId);
+      if (c) { if (c.status !== 'customer') c.status = 'customer'; c.activity.push({ date: today(), text: `Customer signed proposal #${e.number} online — ${e.title}` }); }
+      fire('estimate.signed', { estimate: e, title: `Proposal #${e.number} signed online — ${money(estTotals(e).total)}`, body: `${custName(e.customerId)} · ${e.title}`, link: '#/estimates/' + e.id });
+    }
+  });
   DB.invoices.forEach(i => {
     if (invStatus(i) === 'overdue' && !i.overdueNotified) {
       i.overdueNotified = true;

@@ -105,3 +105,4 @@ body.portal-mode #sidebar,body.portal-mode .topbar{display:none}body.portal-mode
   .sheet{box-shadow:none;max-width:none!important;padding:0}.proposal{border:0}
 }
 table.edit select{min-width:190px}table.edit td:nth-child(2) input{min-width:150px}table.edit input.n{min-width:84px}
+.gate{max-width:380px;margin:12vh auto}.gate h1{margin-bottom:4px}.btns.col{flex-direction:column;align-items:stretch}.btns.col .btn{justify-content:center}

@@ -5,9 +5,12 @@ const NAV = [
   ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
 ];
 function route() { const [, name = 'dashboard', ...args] = location.hash.split('/'); return { name, args }; }
+VIEWS.p = () => VIEWS.portal([DB.customers[0].id]);
 
 function render() {
-  const { name, args } = route(); const v = VIEWS[name] || VIEWS.dashboard;
+  let { name, args } = route();
+  if (PORTAL && name !== 'p') { location.hash = '#/p/' + PORTAL; return; }
+  const v = VIEWS[name] || VIEWS.dashboard;
   const out = v(args);
   document.body.classList.toggle('portal-mode', !!out.portal);
   const unread = DB.notifications.filter(n => !n.read).length;
@@ -34,9 +37,25 @@ document.addEventListener('change', e => {
   else if (el.dataset.svc) CHG.svc(el);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-window.addEventListener('hashchange', () => { closeModal(); render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { if (CLOUD && isPortalHash() !== !!PORTAL) return location.reload(); closeModal(); if (DB) render(); window.scrollTo(0, 0); });
 $('#menu').onclick = () => document.body.classList.toggle('navopen');
 $('#nav').onclick = () => document.body.classList.remove('navopen');
 $('#bell').onclick = () => location.hash = '#/automation';
 
-loadDB(); runChecks(); render();
+async function boot() {
+  if (isPortalHash()) {
+    if (!CLOUD) return showGate('<h1>Portal unavailable</h1><p class="muted">The shared backend is not configured, so portal links cannot be opened.</p>');
+    return bootPortal(portalTokenFromHash());
+  }
+  if (!CLOUD) { loadDB(); runChecks(); return render(); }
+  try {
+    if (!(await cloudSession())) return showLogin();
+    const staff = (await SB.rpc('am_i_staff')).data;
+    if (!staff) return showGate('<h1>No access</h1><p class="muted">Your account is not on the staff list. Ask the owner to add your email.</p><button class="btn" data-act="signOut">Sign out</button>');
+    if (!(await cloudPull())) return firstRun();
+    await processPortalEvents(); runChecks(); render(); setSync('ok');
+    $('.side-foot').innerHTML = '<span id="sync">● Synced</span><br><button class="btn sm" data-act="signOut">Sign out</button>';
+    pollTimer = setInterval(cloudPoll, 20000); document.addEventListener('visibilitychange', () => { if (!document.hidden) cloudPoll(); });
+  } catch (e) { showGate(`<h1>Can’t reach the database</h1><p class="muted">${esc(e.message || e)}</p><button class="btn" onclick="location.reload()">Retry</button>`); }
+}
+boot();
