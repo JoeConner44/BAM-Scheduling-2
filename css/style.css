@@ -106,3 +106,9 @@ body.portal-mode #sidebar,body.portal-mode .topbar{display:none}body.portal-mode
 }
 table.edit select{min-width:190px}table.edit td:nth-child(2) input{min-width:150px}table.edit input.n{min-width:84px}
 .gate{max-width:380px;margin:12vh auto}.gate h1{margin-bottom:4px}.btns.col{flex-direction:column;align-items:stretch}.btns.col .btn{justify-content:center}
+tr.sec td{font-weight:700;background:rgba(127,127,127,.12)}tr.sec input{font-weight:700}
+table.grid td{padding:1px 2px}table.grid input{border-radius:3px;border-color:transparent;background:transparent}table.grid input:hover{border-color:var(--line)}table.grid td:first-child input{min-width:240px}table.grid td:nth-child(2) input{min-width:150px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}.dot.green{background:#16a34a}.dot.yellow{background:#eab308}.dot.red{background:#dc2626}
+tr.age-green td{background:rgba(22,163,74,.12)}tr.age-yellow td{background:rgba(234,179,8,.20)}tr.age-red td{background:rgba(220,38,38,.13)}
+label.inl{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}label.inl input{width:auto}
+.totals label.check{align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:8px}.totals .switch{margin-top:2px}

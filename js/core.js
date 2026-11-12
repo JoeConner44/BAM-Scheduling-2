@@ -65,11 +65,20 @@ function rowCalc(r) {
   const price = r.price === null || r.price === '' || r.price === undefined ? s.price : +r.price;
   return { unit: s.unit, area, qty, price, amt: qty * price };
 }
+const lineAmt = l => (+l.qty || 0) * (+l.price || 0);
+const blank = v => v === '' || v === null || v === undefined;
+const isSection = l => !!String(l.desc || '').trim() && blank(l.qty) && blank(l.price) && !String(l.unit || '').trim();
+const isOpenEst = e => e.status === 'draft' || e.status === 'sent';
+const estAge = e => Math.floor((parseD(today()) - parseD(e.createdAt)) / 864e5);
+const ageColor = e => { const d = estAge(e); return d <= 90 ? 'green' : d <= 180 ? 'yellow' : 'red'; };
 function estTotals(e) {
   const rows = e.rows.reduce((a, r) => a + rowCalc(r).amt, 0);
-  const lines = e.lines.reduce((a, l) => a + (+l.qty || 0) * (+l.price || 0), 0);
-  const sub = rows + lines, tax = sub * (+e.taxRate || 0) / 100;
-  return { rows, lines, sub, tax, total: sub + tax, tons: e.rows.reduce((a, r) => { const c = rowCalc(r); return a + (c.unit === 'ton' ? c.qty : 0); }, 0) };
+  const lines = e.lines.reduce((a, l) => a + lineAmt(l), 0);
+  const calc = rows + lines;
+  // lump-sum override wins; otherwise the calculated total, rounded down to whole dollars unless switched off
+  const sub = !blank(e.lumpSum) ? +e.lumpSum : (e.roundDown === false ? calc : Math.floor(calc + 1e-6));
+  const tax = sub * (+e.taxRate || 0) / 100;
+  return { rows, lines, calc, sub, tax, total: sub + tax, tons: e.rows.reduce((a, r) => { const c = rowCalc(r); return a + (c.unit === 'ton' ? c.qty : 0); }, 0) };
 }
 const invTotal = i => { const s = i.items.reduce((a, l) => a + (+l.qty || 0) * (+l.price || 0), 0); return s + s * (+i.taxRate || 0) / 100; };
 const invPaid = i => i.payments.reduce((a, p) => a + (+p.amount || 0), 0);

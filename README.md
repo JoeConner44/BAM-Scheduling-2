@@ -13,7 +13,7 @@ Data is saved in your browser (localStorage). Use **Settings → Export JSON** t
 | Area | What it does |
 |---|---|
 | **CRM** | Leads → prospects → customers, contact info, activity log, per-customer estimates/jobs/invoices |
-| **Mapping, Estimates & Proposals** | Take-off table (L×W×depth → tons), satellite map measuring (area & linear ft, Esri imagery), editable price list, printable proposal, on-screen e-signature |
+| **Mapping, Estimates & Proposals** | Spreadsheet-style item grid (paste from Excel, Enter/arrow navigation, section headings), Excel proposal import, lump-sum toggle that hides unit prices from the customer, satellite map measuring, printable proposal, e-signature. Open proposals are colour-coded by age (green ≤90 days, yellow 90–180, red older) and filterable by colour and date |
 | **Scheduling & Dispatch** | Drag-and-drop week board by crew, multi-day jobs, unscheduled tray, day dispatch sheet (print/copy for crews) |
 | **Job Sites** | Mobile-friendly job page: start/complete, daily logs (weather, crew, tons), checklists, photos |
 | **Job Costing** | Budget vs actual by material/labor/equipment/other, live margin, cross-job costing table |
@@ -21,6 +21,9 @@ Data is saved in your browser (localStorage). Use **Settings → Export JSON** t
 | **Analytics** | Pipeline, win rate, cash collected, A/R, margins, charts |
 | **Invoicing & Payments** | Invoice from job balance, send, record card/ACH/check payments, overdue tracking |
 | **Automation** | Rules + inbox: signed proposal → create job & alert owner, job complete → draft invoice, budget threshold & overdue alerts, new-lead alerts |
+
+## Importing existing projects
+*Settings → Import projects file* merges a prepared JSON file of customers, proposals and jobs into your data. It never overwrites or duplicates (each project has a key), and creates no alerts or invoices. Keep these files out of the repository — they contain customer data.
 
 ## Shared backend (so customers can use portal links)
 Without setup the app runs in **demo mode** (data in your browser only). To go live with staff logins and real customer links, connect a free [Supabase](https://supabase.com) project (~10 minutes):

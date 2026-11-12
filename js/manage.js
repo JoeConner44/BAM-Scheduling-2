@@ -5,12 +5,12 @@ let weekOf = weekStart(today()), dragJob = null;
 const jobCovers = (j, d) => j.date && j.date <= d && addDays(j.date, (+j.days || 1) - 1) >= d;
 VIEWS.schedule = () => {
   const days = [...Array(7)].map((_, i) => addDays(weekOf, i));
-  const tray = DB.jobs.filter(j => !j.date && j.status !== 'complete');
+  const tray = DB.jobs.filter(j => (!j.date || !j.crewId) && j.status !== 'complete');
   const card = (j, d) => { const cr = byId('crews', j.crewId), first = j.date === d; return `<div class="jcard ${j.status}" draggable="true" data-job="${j.id}" style="--c:${cr ? cr.color : '#9ca3af'}"><a href="#/jobs/${j.id}"><b>${esc(j.name)}</b></a><small>${esc(custName(j.customerId))}${j.days > 1 ? ` · day ${Math.round((parseD(d) - parseD(j.date)) / 864e5) + 1}/${j.days}` : ''}</small>${first ? '' : '<small class="muted">continued</small>'}</div>`; };
   return {
     title: 'Scheduling & Dispatch', html: `
     <div class="toolbar"><div class="btns"><button class="btn" data-act="wk" data-v="-7">‹</button><button class="btn" data-act="wk" data-v="0">Today</button><button class="btn" data-act="wk" data-v="7">›</button></div><b class="grow">${fmtD(days[0])} – ${fmtD(days[6])}</b><button class="btn" data-act="newCrew">+ Crew</button><button class="btn primary" data-act="dispatch">📨 Dispatch day sheet</button></div>
-    <div class="tray" data-drop="tray"><b>Unscheduled (${tray.length})</b> ${tray.map(j => `<div class="jcard chip" draggable="true" data-job="${j.id}" style="--c:#9ca3af"><b>${esc(j.name)}</b><small>${esc(custName(j.customerId))}</small></div>`).join('') || '<span class="muted">Everything is on the board. Drag cards between days & crews to reschedule; drop here to unschedule.</span>'}</div>
+    <div class="tray" data-drop="tray"><b>Needs a crew / date (${tray.length})</b> ${tray.map(j => `<div class="jcard chip" draggable="true" data-job="${j.id}" style="--c:#9ca3af"><b>${esc(j.name)}</b><small>${esc(custName(j.customerId))}${j.date ? ' · target ' + fmtD(j.date) : ''}</small></div>`).join('') || '<span class="muted">Everything is on the board. Drag cards between days & crews to reschedule; drop here to unschedule.</span>'}</div>
     <div class="board scroll"><table class="sched"><tr><th class="crewcol"></th>${days.map(d => `<th class="${d === today() ? 'today' : ''}">${fmtShort(d)}</th>`).join('')}</tr>
     ${DB.crews.map(c => `<tr><th class="crewcol" style="--c:${c.color}"><i></i>${esc(c.name)}</th>${days.map(d => `<td data-drop="cell" data-crew="${c.id}" data-day="${d}" class="${d === today() ? 'today' : ''}">${DB.jobs.filter(j => j.crewId === c.id && jobCovers(j, d)).map(j => card(j, d)).join('')}</td>`).join('')}</tr>`).join('')}</table></div>`
   };
@@ -34,7 +34,7 @@ document.addEventListener('dragover', e => { const t = e.target.closest && e.tar
 document.addEventListener('drop', e => {
   const t = e.target.closest && e.target.closest('[data-drop]'); if (!t || !dragJob) return; e.preventDefault();
   const j = byId('jobs', dragJob);
-  if (t.dataset.drop === 'tray') { j.date = null; j.crewId = null; if (j.status === 'scheduled') j.status = 'unscheduled'; }
+  if (t.dataset.drop === 'tray') { j.crewId = null; if (j.status === 'scheduled') j.status = 'unscheduled'; }
   else {
     // when dragging a continuation day, keep the offset so the whole job shifts naturally
     const offset = j.date ? Math.max(0, Math.round((parseD(t.dataset.day) - parseD(j.date)) / 864e5)) : 0;
@@ -223,8 +223,9 @@ VIEWS.settings = () => ({
   title: 'Settings', html: `<div class="card"><h3>Company</h3><div class="grid4">${[['company', 'Company name'], ['phone', 'Phone'], ['email', 'Email'], ['address', 'Address']].map(([k, l]) => `<label><span>${l}</span><input data-set="${k}" value="${esc(DB.settings[k])}"></label>`).join('')}</div>
   <label class="block"><span>Default proposal terms</span><textarea rows="4" data-set="terms">${esc(DB.settings.terms)}</textarea></label></div>
   <div class="card"><h3>Price list <button class="btn sm" data-act="addSvc">+ Service</button></h3><table class="edit"><tr><th>Service</th><th>Unit</th><th>Price / unit</th><th></th></tr>${DB.settings.services.map(s => `<tr><td><input data-svc="${s.id}" data-f="name" value="${esc(s.name)}"></td><td><select data-svc="${s.id}" data-f="unit">${Object.keys(UNIT_LABEL).map(u => `<option ${u === s.unit ? 'selected' : ''}>${u}</option>`).join('')}</select></td><td><input class="n" type="number" step="0.01" data-svc="${s.id}" data-f="price" value="${s.price}"></td><td><button class="ico" data-act="delSvc" data-id="${s.id}">×</button></td></tr>`).join('')}</table><p class="hint">ton = priced per ton (area × depth); sqft = per square foot; lf = per linear foot; ea = each.</p></div>
-  <div class="card"><h3>Your data</h3><p class="muted">Everything lives in this browser’s storage. Export a backup, or move it to another device.</p><div class="btns"><button class="btn" data-act="exportData">⬇ Export JSON</button><label class="btn">⬆ Import JSON<input type="file" id="importIn" accept="application/json" hidden></label><button class="btn danger ghost" data-act="resetData">Reset to demo data</button><button class="btn danger ghost" data-act="clearData">Start empty</button></div></div>`,
-  mount() { $('#importIn').onchange = async e => { try { const d = JSON.parse(await e.target.files[0].text()); if (d.v !== 1) throw 0; DB = d; save(); render(); toast('Imported'); } catch (x) { toast('Not a valid export file', 'err'); } }; }
+  <div class="card"><h3>Your data</h3><p class="muted">Everything lives in this browser’s storage. Export a backup, or move it to another device.</p><div class="btns"><button class="btn" data-act="exportData">⬇ Export JSON</button><label class="btn primary">⬆ Import projects file<input type="file" id="projIn" accept="application/json" hidden></label><label class="btn">⬆ Restore full backup<input type="file" id="importIn" accept="application/json" hidden></label><button class="btn danger ghost" data-act="resetData">Reset to demo data</button><button class="btn danger ghost" data-act="clearData">Start empty</button></div></div>`,
+  mount() { $('#projIn').onchange = async e => { try { previewProjectImport(JSON.parse(await e.target.files[0].text())); } catch (x) { toast('Not a valid projects file', 'err'); } };
+    $('#importIn').onchange = async e => { try { const d = JSON.parse(await e.target.files[0].text()); if (d.v !== 1) throw 0; DB = d; save(); render(); toast('Imported'); } catch (x) { toast('Not a valid export file', 'err'); } }; }
 });
 CHG.set = el => { DB.settings[el.dataset.set] = el.value; save(); };
 CHG.svc = el => { const s = svc(el.dataset.svc); s[el.dataset.f] = el.dataset.f === 'price' ? +el.value : el.value; save(); };
@@ -233,3 +234,42 @@ ACT.delSvc = el => { if (DB.settings.services.length < 2) return; DB.settings.se
 ACT.exportData = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' })); a.download = `asphaltpro-backup-${today()}.json`; a.click(); };
 ACT.resetData = () => confirmBox('Replace everything with fresh demo data?', () => { resetDemo(); runChecks(); location.hash = '#/dashboard'; render(); });
 ACT.clearData = () => confirmBox('Delete ALL data and start with an empty company?', () => { const s = DB.settings; DB = seed(); Object.assign(DB, { customers: [], estimates: [], jobs: [], invoices: [], notifications: [] }); DB.settings = s; save(); location.hash = '#/dashboard'; render(); });
+
+/* ---------- bulk import of customers / proposals / jobs (merge only: never overwrites or duplicates) ----------
+   File: { asphaltproImport: 1, settings?: {...}, projects: [{ key, customer, title, city, state, total, proposalDate,
+           signedDate, status: draft|sent|signed|declined, job?: { status, date, completedAt }, lines?: [], notes?, driveUrl? }] } */
+const normName = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+function previewProjectImport(f) {
+  if (!f || f.asphaltproImport !== 1 || !Array.isArray(f.projects)) return toast('Not a valid projects file', 'err');
+  const haveKeys = new Set(DB.estimates.map(e => e.importKey).filter(Boolean)), haveCust = new Set(DB.customers.map(c => normName(c.name)));
+  const fresh = f.projects.filter(p => p.key && !haveKeys.has(p.key)), newCust = [...new Set(fresh.map(p => normName(p.customer)))].filter(n => n && !haveCust.has(n));
+  const jobs = fresh.filter(p => p.job).length, tot = fresh.reduce((a, p) => a + (+p.total || 0), 0);
+  modal(`<h3>Import projects</h3><table><tr><td>New proposals</td><td class="num"><b>${fresh.length}</b></td></tr><tr><td>…of which become jobs</td><td class="num"><b>${jobs}</b></td></tr><tr><td>New customers</td><td class="num"><b>${newCust.length}</b></td></tr><tr><td>Total value</td><td class="num"><b>${money(tot)}</b></td></tr><tr><td>Already imported (skipped)</td><td class="num">${f.projects.length - fresh.length}</td></tr></table>
+  ${f.settings ? `<label class="check"><input type="checkbox" id="impSet" checked> Also update company info and default proposal terms</label>` : ''}
+  <p class="hint">Nothing existing is changed or deleted. No alerts or invoices are created for imported records.</p>
+  <div class="actions"><button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" id="impGo" ${fresh.length || f.settings ? '' : 'disabled'}>Import</button></div>`);
+  $('#impGo').onclick = () => { const withSet = $('#impSet') && $('#impSet').checked; closeModal(); applyProjectImport(fresh, withSet ? f.settings : null); };
+}
+function applyProjectImport(projects, settings) {
+  if (settings) Object.assign(DB.settings, settings);
+  const byName = Object.fromEntries(DB.customers.map(c => [normName(c.name), c]));
+  projects.forEach(p => {
+    const won = p.status === 'signed' || !!p.job;
+    let c = byName[normName(p.customer)];
+    if (!c) { c = { id: uid('c'), name: String(p.customer || 'Unknown customer').trim(), contact: '', email: '', phone: '', address: '', status: won ? 'customer' : 'prospect', source: 'Import', notes: '', portalToken: newToken(), activity: [{ date: today(), text: 'Imported from project files' }] }; DB.customers.push(c); byName[normName(c.name)] = c; }
+    else if (won && c.status !== 'customer') c.status = 'customer';
+    const e = {
+      id: uid('e'), number: nextNum('est'), customerId: c.id, title: p.title, address: [p.city, p.state].filter(Boolean).join(', '), status: p.status || (p.job ? 'signed' : 'sent'),
+      createdAt: p.proposalDate || p.signedDate || (p.job && (p.job.completedAt || p.job.date)) || today(), signedAt: p.signedDate || null, taxRate: 0, terms: DB.settings.terms, rows: [],
+      lines: (p.lines || []).map(l => ({ id: uid('l'), desc: l.desc || '', note: l.note || '', qty: l.qty ?? '', unit: l.unit || '', price: l.price ?? '' })),
+      lumpSum: blank(p.total) ? null : +p.total, hidePrices: true, signature: null, autoRan: true, importKey: p.key, driveUrl: p.driveUrl || '', notes: p.notes || ''
+    };
+    DB.estimates.push(e);
+    if (p.job) {
+      const j = makeJob(e); Object.assign(j, { status: p.job.status || 'unscheduled', date: p.job.date || p.job.completedAt || null, completedAt: p.job.completedAt || null, notes: p.notes || '', budget: { material: 0, labor: 0, equipment: 0, other: 0 } });
+      if (j.status === 'complete') j.checklist.forEach(x => x.done = true);
+      DB.jobs.push(j);
+    }
+  });
+  save(); render(); toast(`Imported ${projects.length} project${projects.length === 1 ? '' : 's'}`);
+}
