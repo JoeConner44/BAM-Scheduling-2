@@ -18,6 +18,9 @@ VIEWS.dashboard = () => {
   const months = []; const now = new Date();
   for (let k = 5; k >= 0; k--) { const d = new Date(now.getFullYear(), now.getMonth() - k, 1); months.push({ key: iso(d).slice(0, 7), label: d.toLocaleString('en-US', { month: 'short' }), value: 0 }); }
   pays.forEach(p => { const m = months.find(m => m.key === p.date.slice(0, 7)); if (m) m.value += +p.amount; });
+  const backlog = DB.jobs.filter(j => j.status !== 'complete'), finished = DB.jobs.filter(j => j.status === 'complete');
+  const doneMonths = months.map(m => ({ ...m, value: 0 }));
+  finished.forEach(j => { const m = doneMonths.find(m => m.key === String(j.completedAt || j.date || '').slice(0, 7)); if (m) m.value += jobContract(j); });
   const ws = weekStart(today()), we = addDays(ws, 6);
   const thisWeek = DB.jobs.filter(j => j.date && j.date <= we && addDays(j.date, j.days - 1) >= ws && j.status !== 'complete');
   const unread = DB.notifications.filter(n => !n.read).slice(0, 5);
@@ -28,12 +31,15 @@ VIEWS.dashboard = () => {
     <div class="kpis">
       <div class="kpi"><span>Open pipeline</span><b>${money(open.reduce((a, e) => a + T(e), 0))}</b><small>${open.length} proposals out</small></div>
       <div class="kpi"><span>Win rate</span><b>${winRate}%</b><small>${signed.length} signed of ${decided}</small></div>
+      <div class="kpi"><span>Contract backlog</span><b>${money(backlog.reduce((a, j) => a + jobContract(j), 0))}</b><small>${backlog.length} jobs signed, not finished</small></div>
+      <div class="kpi"><span>Completed work</span><b>${money(finished.reduce((a, j) => a + jobContract(j), 0))}</b><small>${finished.length} jobs finished</small></div>
       <div class="kpi"><span>Collected (all time)</span><b>${money(pays.reduce((a, p) => a + +p.amount, 0))}</b><small>${pays.length} payments</small></div>
       <div class="kpi ${overdue.length ? 'warn' : ''}"><span>Outstanding A/R</span><b>${money(ar)}</b><small>${overdue.length} overdue</small></div>
       <div class="kpi"><span>Margin, completed jobs</span><b>${margin === null ? '—' : margin + '%'}</b><small>${done.length} jobs with costs logged</small></div>
       <div class="kpi"><span>Active jobs</span><b>${DB.jobs.filter(j => j.status === 'in-progress').length}</b><small>${thisWeek.length} on this week’s board</small></div>
     </div>
     <div class="cols">
+      <div class="card"><h3>Completed work by month</h3>${barChart(doneMonths)}</div>
       <div class="card"><h3>Cash collected by month</h3>${barChart(months)}</div>
       <div class="card"><h3>Proposal value by stage</h3>${barChart(funnel)}</div>
     </div>
@@ -63,8 +69,8 @@ VIEWS.crm = () => {
       <input type="search" id="crmSearch" placeholder="Search customers…" value="${esc(crmQ)}">
       <button class="btn primary" data-act="newCustomer">+ New customer</button>
     </div>
-    <div class="card flush"><table class="hover"><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Status</th><th>Pipeline</th><th>Lifetime</th></tr>
-    ${list.map(c => { const es = DB.estimates.filter(e => e.customerId === c.id); const life = DB.invoices.filter(i => i.customerId === c.id).reduce((a, i) => a + invPaid(i), 0); return `<tr data-act="openCustomer" data-id="${c.id}"><td><b>${esc(c.name)}</b><br><small>${esc(c.address)}</small></td><td>${esc(c.contact)}<br><small>${esc(c.email)}</small></td><td>${esc(c.phone)}</td><td>${badge(c.status)}</td><td>${es.filter(e => e.status !== 'signed').length} open</td><td>${money(life)}</td></tr>`; }).join('') || `<tr><td colspan="6">${empty('No customers match')}</td></tr>`}</table></div>`,
+    <div class="card flush"><table class="hover"><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Status</th><th>Open proposals</th><th class="num">Contracted</th></tr>
+    ${list.map(c => { const es = DB.estimates.filter(e => e.customerId === c.id); const op = es.filter(isOpenEst), won = es.filter(e => e.status === 'signed').reduce((a, e) => a + estTotals(e).total, 0); return `<tr data-act="openCustomer" data-id="${c.id}"><td><b>${esc(c.name)}</b><br><small>${esc(c.address)}</small></td><td>${esc(c.contact)}<br><small>${esc(c.email)}</small></td><td>${esc(c.phone)}</td><td>${badge(c.status)}</td><td>${op.length ? op.length + ' · ' + money(op.reduce((a, e) => a + estTotals(e).total, 0)) : '—'}</td><td class="num">${money(won)}</td></tr>`; }).join('') || `<tr><td colspan="6">${empty('No customers match')}</td></tr>`}</table></div>`,
     mount() { const s = $('#crmSearch'); s.oninput = () => { crmQ = s.value; const p = s.selectionStart; render(); const n = $('#crmSearch'); n.focus(); n.setSelectionRange(p, p); }; }
   };
 };
@@ -96,18 +102,19 @@ ACT.delCustomer = el => confirmBox('Delete this customer? Their estimates, jobs 
 ACT.newEstimateFor = el => { closeModal(); newEstimate(el.dataset.id); };
 
 /* ================= ESTIMATES ================= */
-let estFilter = 'open', estColor = 'all', estFrom = '', estTo = '';
+let estFilter = null, estColor = 'all', estFrom = '', estTo = '';
 const AGE_LABEL = { green: '0–90 days', yellow: '90–180 days', red: 'Over 180 days' };
 VIEWS.estimates = args => {
   if (args[0]) return estimateEditor(byId('estimates', args[0]));
+  const tab = estFilter || (DB.estimates.some(isOpenEst) ? 'open' : 'all');
   const inTab = (e, s) => s === 'all' || (s === 'open' ? isOpenEst(e) : e.status === s);
   const inDates = e => (!estFrom || e.createdAt >= estFrom) && (!estTo || e.createdAt <= estTo);
-  const base = DB.estimates.filter(e => inTab(e, estFilter) && inDates(e));
+  const base = DB.estimates.filter(e => inTab(e, tab) && inDates(e));
   const list = base.filter(e => estColor === 'all' || (isOpenEst(e) && ageColor(e) === estColor)).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.number - a.number);
   const cc = c => base.filter(e => isOpenEst(e) && ageColor(e) === c).length;
   return {
     title: 'Estimates & Proposals', html: `
-  <div class="toolbar"><div class="tabs">${['open', 'draft', 'sent', 'signed', 'declined', 'all'].map(s => `<button class="${estFilter === s ? 'on' : ''}" data-act="estFilter" data-v="${s}">${s} <i>${DB.estimates.filter(e => inTab(e, s)).length}</i></button>`).join('')}</div><span class="grow"></span><button class="btn primary" data-act="newEstimate">+ New estimate</button></div>
+  <div class="toolbar"><div class="tabs">${['open', 'draft', 'sent', 'signed', 'declined', 'all'].map(s => `<button class="${tab === s ? 'on' : ''}" data-act="estFilter" data-v="${s}">${s} <i>${DB.estimates.filter(e => inTab(e, s)).length}</i></button>`).join('')}</div><span class="grow"></span><button class="btn primary" data-act="newEstimate">+ New estimate</button></div>
   <div class="toolbar"><div class="tabs"><button class="${estColor === 'all' ? 'on' : ''}" data-act="estColor" data-v="all">Any age</button>${['green', 'yellow', 'red'].map(c => `<button class="${estColor === c ? 'on' : ''}" data-act="estColor" data-v="${c}"><span class="dot ${c}"></span>${AGE_LABEL[c]} <i>${cc(c)}</i></button>`).join('')}</div>
     <label class="inl">Proposal date from <input type="date" id="estFrom" value="${estFrom}"></label><label class="inl">to <input type="date" id="estTo" value="${estTo}"></label>${estFrom || estTo || estColor !== 'all' ? '<button class="btn sm" data-act="estClear">Clear filters</button>' : ''}
     <span class="grow"></span><b>${list.length} shown · ${money(list.reduce((a, e) => a + estTotals(e).total, 0))}</b></div>

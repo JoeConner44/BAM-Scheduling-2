@@ -43,7 +43,7 @@ const empty = (t, sub) => `<div class="empty"><b>${esc(t)}</b><span>${esc(sub ||
 
 function barChart(data, { h = 180, fmt = money } = {}) {
   const w = 520, pad = 28, max = Math.max(1, ...data.map(d => d.value)), bw = (w - pad) / data.length;
-  return `<svg viewBox="0 0 ${w} ${h + 26}" class="chart" role="img">` +
+  return `<svg viewBox="0 -10 ${w} ${h + 36}" class="chart" role="img">` +
     [0, .5, 1].map(f => `<line x1="${pad}" x2="${w}" y1="${h - h * f}" y2="${h - h * f}" class="grid"/><text x="0" y="${h - h * f + 4}" class="axis">${fmt(max * f).replace(/\.0+$/, '')}</text>`).join('') +
     data.map((d, i) => { const bh = d.value / max * h, x = pad + i * bw + bw * .18; return `<rect x="${x}" y="${h - bh}" width="${bw * .64}" height="${bh}" rx="3" class="barfill"><title>${esc(d.label)}: ${fmt(d.value)}</title></rect><text x="${x + bw * .32}" y="${h + 16}" text-anchor="middle" class="axis">${esc(d.label)}</text>`; }).join('') + '</svg>';
 }
