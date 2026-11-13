@@ -178,7 +178,7 @@ function estimateEditor(e) {
       <div class="scroll"><table class="edit grid"><tr><th>Proposed item</th><th>Description</th><th>Qty</th><th>Units</th><th>Unit price</th><th class="num">Total</th><th></th></tr>${e.lines.map(lineHTML).join('')}</table></div>
       <p class="hint">Works like a spreadsheet: Enter / ↑ ↓ move between rows, and you can paste a block of cells copied from Excel. A row with only a name (no qty, unit or price) becomes a section heading.</p></div>
     ${e.rows.length ? `<div class="card"><h3>Paving take-off</h3><div class="scroll"><table class="edit"><tr><th>Service</th><th>Area / note</th><th>L (ft)</th><th>W (ft)</th><th>Area (sf)</th><th>Depth (in)</th><th>Qty</th><th>$ / unit</th><th>Amount</th><th></th></tr>${e.rows.map(rowHTML).join('')}</table></div></div>` : ''}
-    <div class="cols"><div class="card"><h3>Terms</h3><textarea class="terms" data-e="terms" rows="8" ${dis}>${esc(e.terms)}</textarea></div>
+    <div class="cols"><div class="card"><h3>Terms</h3><textarea class="terms" data-e="terms" rows="8" ${dis}>${esc(e.terms || DB.settings.terms)}</textarea></div>
     <div class="card totals">
       <label class="check"><span class="switch"><input type="checkbox" data-e="hidePrices" ${e.hidePrices !== false ? 'checked' : ''} ${dis}><i></i></span> <span><b>Lump-sum proposal</b><br><small>Customer sees items, quantities and the total only — unit prices and line totals are hidden.</small></span></label>
       <div><span>Calculated from line items</span><b id="t-calc">${money2(t.calc)}</b></div>
@@ -285,7 +285,7 @@ function proposalHTML(e) {
   ${lines.map(l => isSection(l) ? `<tr class="sec"><td colspan="${n}">${esc(l.desc)}</td></tr>` : `<tr><td>${esc(l.desc)}</td><td>${esc(l.note)}</td><td class="num">${l.qty === '' || l.qty == null ? '' : num(l.qty, 2)}</td><td>${esc(l.unit)}</td>${px(l.price === '' || l.price == null ? '' : money2(l.price), money2(lineAmt(l)))}</tr>`).join('')}
   ${t.tax ? `<tr><td colspan="${n - 1}" class="num">Tax (${e.taxRate}%)</td><td class="num">${money2(t.tax)}</td></tr>` : ''}
   <tr class="grand"><td colspan="${n - 1}" class="num"><b>Total of proposed items listed above:</b></td><td class="num"><b>${money2(t.total)}</b></td></tr></table>
-  <h4>Contract notes &amp; terms</h4><p class="terms-text">${esc(e.terms)}</p>
+  <h4>Contract notes &amp; terms</h4><p class="terms-text">${esc(e.terms || s.terms)}</p>
   <div class="sigblock"><div>${e.signature ? `${e.signature.img ? `<img src="${e.signature.img}" alt="signature">` : `<div class="typed">${esc(e.signature.name)}</div>`}` : '<div class="sigline"></div>'}<small>Accepted by ${e.signature ? esc(e.signature.name) + ' on ' + fmtD(e.signature.date) : '________________________'}</small></div><div><div class="sigline"></div><small>${esc(s.company)} authorized signature</small></div></div></div>`;
 }
 ACT.preview = el => { const e = byId('estimates', el.dataset.id); modal(`<div class="noprint btns"><button class="btn primary" onclick="window.print()">Print / Save PDF</button></div>${proposalHTML(e)}`, { wide: true, print: true }); };

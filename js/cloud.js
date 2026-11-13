@@ -3,7 +3,7 @@
 const CFG = window.ASPHALT_CONFIG || {};
 let CLOUD = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase);
 let PORTAL = null;            // portal token when a customer is viewing their link
-let SB = null, snap = {}, pushTimer = null, pushing = false, again = false, pollTimer = null;
+let SB = null, snap = {}, pushTimer = null, pushing = false, again = false, pollTimer = null, lastSeen = '', pollN = 0;
 const COLLS = ['customers', 'estimates', 'jobs', 'invoices', 'crews', 'rules', 'notifications'];
 const isPortalHash = () => /^#\/p\//.test(location.hash);
 const portalTokenFromHash = () => decodeURIComponent(location.hash.slice(4).split(/[/?]/)[0]);
@@ -25,8 +25,8 @@ function rowsToDB(rows) {
 async function fetchAllRows() {
   let all = [], from = 0;
   for (;;) {
-    const { data, error } = await SB.from('records').select('coll,id,data').order('coll').order('id').range(from, from + 999);
-    if (error) throw error; all = all.concat(data); if (data.length < 1000) return all; from += 1000;
+    const { data, error } = await SB.from('records').select('coll,id,data,updated_at').order('coll').order('id').range(from, from + 999);
+    if (error) throw error; all = all.concat(data); data.forEach(r => { if (r.updated_at > lastSeen) lastSeen = r.updated_at; }); if (data.length < 1000) return all; from += 1000;
   }
 }
 
@@ -49,18 +49,40 @@ async function cloudPush() {
 function setSync(s) { const el = $('#sync'); if (el) el.textContent = s === 'ok' ? '● Synced' : s === 'err' ? '● Offline — retrying' : '● Saving…'; }
 
 /* ---------- pull / poll ---------- */
-async function cloudPull(apply) {
+async function cloudPull() {
   const rows = await fetchAllRows(), db = rowsToDB(rows);
   if (!db) return false;
-  const remote = flatten(db);
-  if (apply === 'poll') { const same = Object.keys(remote).length === Object.keys(snap).length && Object.keys(remote).every(k => remote[k] === snap[k]); if (same) return false; }
-  DB = db; snap = remote; return true;
+  DB = db; snap = flatten(db); return true;
+}
+/* Incremental poll: fetch only records changed since the last one we saw (keeps bandwidth tiny even with thousands of records). */
+const canon = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, q) => (o[q] = x[q], o), {}) : x);
+function applyRow(r) {
+  const key = r.coll + '|' + r.id;
+  if (snap[key] && canon(JSON.parse(snap[key])) === canon(r.data)) return false;   // our own save coming back
+  if (r.coll === 'meta') { if (r.id === 'settings') DB.settings = r.data; else if (r.id === 'seq') DB.seq = r.data; }
+  else if (COLLS.includes(r.coll)) { const arr = DB[r.coll], i = arr.findIndex(x => x.id === r.id); if (i >= 0) arr[i] = r.data; else arr.push(r.data); }
+  snap[key] = JSON.stringify(r.data); return true;
+}
+async function cloudPollChanges() {
+  let changed = false;
+  for (;;) {
+    const { data, error } = await SB.from('records').select('coll,id,data,updated_at').gt('updated_at', lastSeen).order('updated_at').limit(500);
+    if (error) throw error;
+    data.forEach(r => { if (applyRow(r)) changed = true; if (r.updated_at > lastSeen) lastSeen = r.updated_at; });
+    if (data.length < 500) break;
+  }
+  if (++pollN % 15 === 0) {   // every ~5 minutes: cheap id-only listing to notice records deleted elsewhere
+    const remote = new Set(); let from = 0;
+    for (;;) { const { data, error } = await SB.from('records').select('coll,id').order('coll').order('id').range(from, from + 999); if (error) throw error; data.forEach(r => remote.add(r.coll + '|' + r.id)); if (data.length < 1000) break; from += 1000; }
+    Object.keys(snap).forEach(k => { if (remote.has(k)) return; const [c, ...rest] = k.split('|'); if (COLLS.includes(c)) DB[c] = DB[c].filter(x => x.id !== rest.join('|')); delete snap[k]; changed = true; });
+  }
+  return changed;
 }
 const idle = () => !pushTimer && !pushing && !$('#modal.open') && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '');
 async function cloudPoll() {
   if (!CLOUD || PORTAL || document.hidden || !idle()) return;
   try {
-    let changed = await cloudPull('poll');
+    let changed = await cloudPollChanges();
     if (await processPortalEvents()) changed = true;
     if (changed) { runChecks(); render(); }
   } catch (e) { setSync('err'); }

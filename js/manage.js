@@ -260,7 +260,7 @@ function applyProjectImport(projects, settings) {
     else if (won && c.status !== 'customer') c.status = 'customer';
     const e = {
       id: uid('e'), number: nextNum('est'), customerId: c.id, title: p.title, address: [p.city, p.state].filter(Boolean).join(', '), status: p.status || (p.job ? 'signed' : 'sent'),
-      createdAt: p.proposalDate || p.signedDate || (p.job && (p.job.completedAt || p.job.date)) || today(), signedAt: p.signedDate || null, taxRate: 0, terms: DB.settings.terms, rows: [],
+      createdAt: p.proposalDate || p.signedDate || (p.job && (p.job.completedAt || p.job.date)) || today(), signedAt: p.signedDate || null, taxRate: 0, terms: '', rows: [],
       lines: (p.lines || []).map(l => ({ id: uid('l'), desc: l.desc || '', note: l.note || '', qty: l.qty ?? '', unit: l.unit || '', price: l.price ?? '' })),
       lumpSum: blank(p.total) ? null : +p.total, hidePrices: true, signature: null, autoRan: true, importKey: p.key, driveUrl: p.driveUrl || '', notes: p.notes || ''
     };
