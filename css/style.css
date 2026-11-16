@@ -147,3 +147,4 @@ body.tk-open{overflow:hidden}#tk{position:fixed;inset:0;z-index:60;display:flex;
 .wide2{grid-column:span 2}.warnt{color:#b45309}table.bidt td{padding:6px 8px}table.bidt input{max-width:260px}
 .bidsel{border:1px solid var(--line);border-radius:8px;padding:4px 10px;margin-bottom:10px}.bidsel label.check{margin:6px 0;flex-wrap:wrap}.bidsel input[data-bemail]{flex:1;min-width:180px;max-width:300px}
 th.sortable{cursor:pointer}th.sortable.on{color:var(--ink)}th.sortable.on:after{content:" ▾"}
+table.pa td{padding:3px 6px}table.pa input.n{min-width:96px}.proposal .pasum td:first-child{width:28px;color:#555}.proposal .pacont{font-size:.86em}.proposal .pacont th,.proposal .pacont td{padding:4px 5px}

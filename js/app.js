@@ -32,6 +32,7 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.matches('[data-e],[data-r],[data-l]')) CHG.estimate(el);
   else if (el.dataset.bud) CHG.budget(el);
+  else if (el.dataset.sov) CHG.sov(el);            // must come before the generic job-field handler below
   else if (el.dataset.j !== undefined && (el.dataset.f || el.dataset.chk !== undefined)) CHG.job(el);
   else if (el.dataset.rule) CHG.rule(el);
   else if (el.dataset.set) CHG.set(el);
@@ -40,6 +41,7 @@ document.addEventListener('change', e => {
   else if (el.dataset.priv) CHG.priv(el);
   else if (el.dataset.em) CHG.em(el);
   else if (el.dataset.cemail) CHG.cemail(el);
+  else if (el.dataset.ret) CHG.ret(el);
   else if (el.dataset.fu) CHG.fu(el);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });

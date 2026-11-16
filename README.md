@@ -17,6 +17,7 @@ Data is saved in your browser (localStorage). Use **Settings → Export JSON** t
 | **Bid tracking** | Bid due dates, every contractor a job was bid to (each emailed separately), won/lost with reasons, win rate by contractor, and a bulk tool for giving imported proposals a contractor |
 | **Scheduling & Dispatch** | Drag-and-drop week board by crew, multi-day jobs, unscheduled tray, day dispatch sheet (print/copy for crews) |
 | **Job Sites** | Mobile-friendly job page: start/complete, daily logs (weather, crew, tons), checklists, photos |
+| **Change orders & progress billing** | Change orders that revise the contract once approved, a schedule of values, pay applications with retainage (held and released) laid out like an AIA G702/G703, an invoice created from each application, and all of it printable or emailed as a PDF |
 | **Job Costing** | Budget vs actual by material/labor/equipment/other, live margin, cross-job costing table |
 | **Customer Portal** | Per-customer page: sign proposals, track project status & updates, view/pay invoices, message the office |
 | **Analytics** | Pipeline, win rate, cash collected, A/R, margins, charts |

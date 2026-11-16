@@ -91,7 +91,8 @@ function invStatus(i) {
 }
 const jobCost = j => j.costs.reduce((a, c) => a + (+c.amount || 0), 0);
 const jobBudget = j => Object.values(j.budget).reduce((a, b) => a + (+b || 0), 0);
-const jobContract = j => { const e = byId('estimates', j.estimateId); return e ? estTotals(e).total : (+j.contract || 0); };
+const jobBaseContract = j => { const e = byId('estimates', j.estimateId); return e ? estTotals(e).total : (+j.contract || 0); };   // original contract
+const jobContract = j => jobBaseContract(j) + (j.changeOrders || []).filter(c => c.status === 'approved').reduce((a, c) => a + (+c.amount || 0), 0);   // revised: plus approved change orders
 const priv = () => DB.private || (DB.private = {});   // staff-only settings (API keys); synced as its own record, not exposed to portals
 const byId = (coll, id) => DB[coll].find(x => x.id === id);
 const custName = id => (byId('customers', id) || { name: '(deleted)' }).name;
