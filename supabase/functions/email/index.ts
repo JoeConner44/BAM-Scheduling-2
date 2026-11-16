@@ -109,21 +109,31 @@ async function runFollowups(dryRun: boolean) {
   // proposals: still open, opted in to follow-ups, and due for the next one in the schedule
   const days = numList(f.days, [7, 21, 45]), maxAge = +f.maxAge || 90;
   for (const r of ((await db("records?coll=eq.estimates&data->>status=eq.sent&select=id,data")) || []) as Rec[]) {
-    const e = r.data, c = customers[e.customerId], to = list(e.followTo || c?.email).filter(isEmail);
+    const e = r.data, c = customers[e.customerId];
+    // a bid sent to several contractors carries followList; otherwise it is the single address it was sent to
+    const targets: { to: string[]; contact: string; customer: string; link: string }[] = (Array.isArray(e.followList) && e.followList.length
+      ? e.followList.map((x: Rec["data"]) => ({ to: list(x.to).filter(isEmail), contact: String(x.contact || "there"), customer: customers[x.customerId]?.name || "", link: x.customerId === e.customerId ? link(c) : "" }))
+      : [{ to: list(e.followTo || c?.email).filter(isEmail), contact: firstName(c), customer: c?.name || "", link: link(c) }]).filter((x: { to: string[] }) => x.to.length);
     const start = e.sentAt || e.createdAt, k = +e.followCount || 0;
-    if (!e.follow || !to.length || !start || k >= days.length) continue;
+    if (!e.follow || !targets.length || !start || k >= days.length) continue;
     const age = daysBetween(start, t);
     if (age < days[k] || age > maxAge || e.lastFollowAt === t) continue;
-    const vars = { contact: firstName(c), customer: c?.name || "", company: settings.company || "", project: e.title || "", total: money(estimateTotal(e)), date: fmtDate(start), number: String(e.number ?? ""), link: link(c) };
-    const subject = fill(tpl.followSubject, vars);
-    out.due.push({ kind: "proposal", id: r.id, number: e.number, title: e.title, to, step: k + 1, age });
+    const common = { company: settings.company || "", project: e.title || "", total: money(estimateTotal(e)), date: fmtDate(start), number: String(e.number ?? "") };
+    for (const tg of targets) out.due.push({ kind: "proposal", id: r.id, number: e.number, title: e.title, to: tg.to, step: k + 1, age });
     if (dryRun) continue;
-    try {
-      await sendMail({ to, subject, html: emailHTML(fill(tpl.followBody, vars), vars.link ? { label: "View proposal", url: vars.link } : null, settings, accent) });
-      const data = { ...e, followCount: k + 1, lastFollowAt: t, emails: [...(e.emails || []), { date: t, to: to.join(", "), subject, kind: `follow-up ${k + 1}`, auto: true }] };
-      await db(`records?coll=eq.estimates&id=eq.${encodeURIComponent(r.id)}`, { method: "PATCH", body: JSON.stringify({ data }) });
-      out.sent++;
-    } catch (x) { out.errors.push(`Proposal #${e.number}: ${(x as Error).message}`); }
+    const log: Record<string, unknown>[] = [];
+    for (const tg of targets) {      // one separate email per contractor, so they never see each other
+      const vars = { ...common, contact: tg.contact, customer: tg.customer, link: tg.link };
+      const subject = fill(tpl.followSubject, vars);
+      try {
+        await sendMail({ to: tg.to, subject, html: emailHTML(fill(tpl.followBody, vars), tg.link ? { label: "View proposal", url: tg.link } : null, settings, accent) });
+        log.push({ date: t, to: tg.to.join(", "), subject, kind: `follow-up ${k + 1}`, auto: true }); out.sent++;
+      } catch (x) { out.errors.push(`Proposal #${e.number} (${tg.to.join(", ")}): ${(x as Error).message}`); }
+    }
+    if (log.length) {
+      try { await db(`records?coll=eq.estimates&id=eq.${encodeURIComponent(r.id)}`, { method: "PATCH", body: JSON.stringify({ data: { ...e, followCount: k + 1, lastFollowAt: t, emails: [...(e.emails || []), ...log] } }) }); }
+      catch (x) { out.errors.push(`Proposal #${e.number}: ${(x as Error).message}`); }
+    }
   }
 
   // invoices: sent, unpaid and past due

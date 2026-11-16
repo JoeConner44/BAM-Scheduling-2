@@ -119,7 +119,7 @@ VIEWS.estimates = args => {
     <label class="inl">Proposal date from <input type="date" id="estFrom" value="${estFrom}"></label><label class="inl">to <input type="date" id="estTo" value="${estTo}"></label>${estFrom || estTo || estColor !== 'all' ? '<button class="btn sm" data-act="estClear">Clear filters</button>' : ''}
     <span class="grow"></span><b>${list.length} shown · ${money(list.reduce((a, e) => a + estTotals(e).total, 0))}</b></div>
   <div class="card flush"><table class="hover"><tr><th>#</th><th>Project</th><th>Customer</th><th>Proposal date</th><th>Age</th><th class="num">Total</th><th>Status</th></tr>
-  ${list.map(e => { const t = estTotals(e), o = isOpenEst(e); return `<tr class="${o ? 'age-' + ageColor(e) : ''}" onclick="location.hash='#/estimates/${e.id}'"><td>${e.number}</td><td><b>${esc(e.title)}</b><br><small>${esc(e.address)}</small></td><td>${esc(custName(e.customerId))}</td><td>${fmtD(e.createdAt)}</td><td>${o ? `<span class="dot ${ageColor(e)}"></span>${estAge(e)} d` : '—'}</td><td class="num">${money(t.total)}</td><td>${badge(e.status)}</td></tr>`; }).join('') || `<tr><td colspan="7">${empty('No proposals match', 'Change the filters or create a new estimate')}</td></tr>`}</table></div>
+  ${list.map(e => { const t = estTotals(e), o = isOpenEst(e); return `<tr class="${o ? 'age-' + ageColor(e) : ''}" onclick="location.hash='#/estimates/${e.id}'"><td>${e.number}</td><td><b>${esc(e.title)}</b><br><small>${esc(e.address)}</small></td><td>${esc(estCustLabel(e))}${e.bidDue && o ? `<br><small class="${dueClass(e.bidDue)}">bid due ${fmtShort(e.bidDue)}</small>` : ''}</td><td>${fmtD(e.createdAt)}</td><td>${o ? `<span class="dot ${ageColor(e)}"></span>${estAge(e)} d` : '—'}</td><td class="num">${money(t.total)}</td><td>${badge(e.status)}</td></tr>`; }).join('') || `<tr><td colspan="7">${empty('No proposals match', 'Change the filters or create a new estimate')}</td></tr>`}</table></div>
   <p class="hint">Open proposals are colored by proposal date: green = last 90 days, yellow = 90–180 days, red = older than 180 days.</p>`,
     mount() { $('#estFrom').onchange = e => { estFrom = e.target.value; render(); }; $('#estTo').onchange = e => { estTo = e.target.value; render(); }; }
   };
@@ -174,6 +174,7 @@ function estimateEditor(e) {
       <label><span>Project title</span><input data-e="title" value="${esc(e.title)}" ${dis}></label>
       <label><span>Location</span><input data-e="address" value="${esc(e.address)}" ${dis}></label>
       <label><span>Proposal date</span><input type="date" data-e="createdAt" value="${esc(e.createdAt)}" ${dis}></label></div></div>
+    ${bidCardHTML(e)}
     <div class="card"><h3>Proposed items ${locked ? '' : `<span class="btns"><button class="btn sm" data-act="xlsImport" data-id="${e.id}">⬆ Import Excel</button><button class="btn sm primary" data-act="takeoff" data-id="${e.id}">🛰 Satellite take-off${e.takeoff && e.takeoff.shapes.length ? ` (${e.takeoff.shapes.length})` : ''}</button><button class="btn sm" data-act="addLine" data-id="${e.id}" data-n="10">+ 10 rows</button><button class="btn sm" data-act="addLine" data-id="${e.id}">+ Row</button></span>`}</h3>
       <div class="scroll"><table class="edit grid"><tr><th>Proposed item</th><th>Description</th><th>Qty</th><th>Units</th><th>Unit price</th><th class="num">Total</th><th></th></tr>${e.lines.map(lineHTML).join('')}</table></div>
       <p class="hint">Works like a spreadsheet: Enter / ↑ ↓ move between rows, and you can paste a block of cells copied from Excel. Start typing an item to pick it from your price book. A row with only a name (no qty, unit or price) becomes a section heading.</p></div>
@@ -186,7 +187,8 @@ function estimateEditor(e) {
       <label class="check"><input type="checkbox" data-e="roundDown" ${e.roundDown !== false ? 'checked' : ''} ${dis}> Round total down to whole dollars</label>
       <div><span>Lump-sum override <small>(blank = use calculated)</small></span><input class="n" style="max-width:140px" inputmode="decimal" data-e="lumpSum" value="${e.lumpSum ?? ''}" ${dis}></div>
       <div><span>Sales tax %</span><input class="n" style="max-width:140px" type="number" step="0.01" data-e="taxRate" value="${e.taxRate}" ${dis}></div>
-      <div class="grand"><span>Proposal total</span><b id="t-total">${money(t.total)}</b></div></div></div>`
+      <div class="grand"><span>Proposal total</span><b id="t-total">${money(t.total)}</b></div></div></div>`,
+    mount() { bidCardMount(e); }
   };
 }
 function refreshEstimate(e) {

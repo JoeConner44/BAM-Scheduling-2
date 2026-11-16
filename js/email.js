@@ -64,29 +64,55 @@ function emailVars(kind, rec, c) {
 function openEmailDialog(kind, id) {
   const rec = byId(kind === 'proposal' ? 'estimates' : 'invoices', id), t = emailTpl(), isP = kind === 'proposal';
   const cur = byId('customers', rec.customerId), unassigned = !cur || cur.name === 'Unassigned';
+  const multi = isP && bidders(rec).length > 1;      // bid going to several contractors: each gets their own separate email
+  const firstOf = c => String((c && c.contact) || '').trim().split(/\s+/)[0] || 'there';
   const paint = custId => {
     const c = byId('customers', custId), v = emailVars(kind, rec, c);
+    if (multi) { v.contact = '{{contact}}'; v.customer = '{{customer}}'; }
     modal(`<form id="emForm"><h3>✉ Email ${isP ? 'proposal' : 'invoice'} #${esc(rec.number)}</h3>
-      ${isP && rec.status !== 'signed' ? `<label class="block"><span>Customer / contractor this is going to</span><select id="emCust">${unassigned ? '<option value="">— choose who this is for —</option>' : ''}${[...DB.customers].filter(x => x.name !== 'Unassigned').sort((a, b) => a.name.localeCompare(b.name)).map(x => `<option value="${x.id}" ${x.id === custId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__new">+ New customer…</option></select></label>` : ''}
-      <div class="grid2"><label class="wide"><span>To (separate several with commas)</span><input name="to" required value="${esc(rec.followTo || (c && c.name !== 'Unassigned' && c.email) || '')}" placeholder="name@company.com"></label>
-      <label class="wide"><span>Cc (optional)</span><input name="cc" value=""></label>
+      ${multi ? `<label class="block"><span>Send to — each contractor gets their own separate email and never sees the others</span></label>
+        <div class="bidsel">${bidders(rec).map(b => { const bc = byId('customers', b.customerId) || {}; return `<label class="check"><input type="checkbox" name="bid" value="${b.id}" ${b.sentAt ? '' : 'checked'}> <b>${esc(bc.name)}</b><input data-bemail="${b.id}" value="${esc(bc.email || '')}" placeholder="email address">${b.sentAt ? `<small>sent ${fmtD(b.sentAt)}</small>` : ''}</label>`; }).join('')}</div>`
+      : `${isP && rec.status !== 'signed' ? `<label class="block"><span>Customer / contractor this is going to</span><select id="emCust">${unassigned ? '<option value="">— choose who this is for —</option>' : ''}${[...DB.customers].filter(x => x.name !== 'Unassigned').sort((a, b) => a.name.localeCompare(b.name)).map(x => `<option value="${x.id}" ${x.id === custId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__new">+ New customer…</option></select></label>` : ''}`}
+      <div class="grid2">${multi ? '' : `<label class="wide"><span>To (separate several with commas)</span><input name="to" required value="${esc(rec.followTo || (c && c.name !== 'Unassigned' && c.email) || '')}" placeholder="name@company.com"></label>
+      <label class="wide"><span>Cc (optional)</span><input name="cc" value=""></label>`}
       <label class="wide"><span>Subject</span><input name="subject" required value="${esc(fillTpl(isP ? t.proposalSubject : t.invoiceSubject, v))}"></label>
-      <label class="wide"><span>Message</span><textarea name="body" rows="9" required>${esc(fillTpl(isP ? t.proposalBody : t.invoiceBody, v))}</textarea></label></div>
+      <label class="wide"><span>Message${multi ? ' — {{contact}} becomes each person’s first name' : ''}</span><textarea name="body" rows="9" required>${esc(fillTpl(isP ? t.proposalBody : t.invoiceBody, v))}</textarea></label></div>
       <label class="check"><input type="checkbox" name="pdf" checked> Attach the ${isP ? 'proposal' : 'invoice'} as a PDF</label>
-      <label class="check"><input type="checkbox" name="link" ${v.link ? 'checked' : 'disabled'}> Include a button to ${isP ? 'review and sign' : 'view it'} online ${v.link ? '' : '<small>(choose a customer first)</small>'}</label>
+      ${multi ? '' : `<label class="check"><input type="checkbox" name="link" ${v.link ? 'checked' : 'disabled'}> Include a button to ${isP ? 'review and sign' : 'view it'} online ${v.link ? '' : '<small>(choose a customer first)</small>'}</label>`}
       <label class="check"><input type="checkbox" name="follow" ${rec.follow === false ? '' : 'checked'}> Send automatic ${isP ? 'follow-ups while this proposal is still open' : 'reminders if this invoice goes past due'}</label>
       <p class="hint">Sent from your company email address; replies go to your office inbox.${followCfg().enabled ? '' : ' Automatic follow-ups are switched off — turn them on under Email & Follow-ups.'}</p>
       <div class="actions"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn primary" id="emGo">Send email</button></div></form>`, { wide: true });
     const sel = $('#emCust');
     if (sel) sel.onchange = () => {
       if (sel.value !== '__new') return paint(sel.value);
-      const name = prompt('New customer / contractor name:'); if (!name || !name.trim()) return paint(custId);
-      let n = DB.customers.find(x => normName(x.name) === normName(name));
-      if (!n) { n = { id: uid('c'), name: name.trim(), contact: '', email: '', phone: '', address: '', status: 'prospect', source: 'Proposal', notes: '', portalToken: newToken(), activity: [{ date: today(), text: 'Added when emailing a proposal' }] }; DB.customers.push(n); save(); }
-      paint(n.id);
+      const n = findOrCreateCustomer(prompt('New customer / contractor name:')); if (!n) return paint(custId);
+      save(); paint(n.id);
     };
     $('#emForm').onsubmit = async ev => {
-      ev.preventDefault(); const f = new FormData(ev.target), to = addrList(f.get('to')), cc = addrList(f.get('cc')), go = $('#emGo');
+      ev.preventDefault(); const f = new FormData(ev.target), go = $('#emGo'), subject = f.get('subject'), body = f.get('body');
+      const pdfName = safeFile(isP ? `Proposal - ${rec.title} - ${rec.createdAt}` : `Invoice ${rec.number}`) + '.pdf';
+      const done = () => { rec.follow = !!f.get('follow'); if (rec.status === 'draft') rec.status = 'sent'; if (isP) { rec.sentAt = today(); rec.followCount = 0; } else rec.remindCount = 0; save(); closeModal(); render(); };
+      if (multi) {   // ---- one separate email per ticked contractor
+        const picks = f.getAll('bid').map(bid => { const b = bidders(rec).find(x => x.id === bid), bc = byId('customers', b.customerId); return { b, bc, to: addrList($(`[data-bemail="${bid}"]`).value) }; });
+        if (!picks.length) return toast('Tick at least one contractor', 'err');
+        const bad = picks.find(p => !p.to.length || !p.to.every(isEmailAddr)); if (bad) return toast(`Add a valid email address for ${bad.bc.name}`, 'err');
+        go.disabled = true; let sent = 0; const failed = [];
+        for (const p of picks) {
+          go.textContent = `Sending ${sent + failed.length + 1} of ${picks.length}…`;
+          try {
+            if (!p.bc.email) p.bc.email = p.to[0];
+            const vars = { contact: firstOf(p.bc), customer: p.bc.name }, subj = fillTpl(subject, vars);
+            const attachments = f.get('pdf') ? [{ filename: pdfName, content: await htmlToPdfBase64(proposalHTML({ ...rec, customerId: p.bc.id }), 'document.pdf') }] : [];   // "Prepared for" names this contractor
+            await emailCall('send', { to: p.to, subject: subj, html: emailHTML(fillTpl(body, vars), null), attachments });
+            p.b.sentAt = today(); (rec.emails = rec.emails || []).push({ date: today(), to: p.to.join(', '), subject: subj, kind: 'proposal' });
+            p.bc.activity.push({ date: today(), text: `Emailed proposal #${rec.number} to ${p.to.join(', ')}` }); sent++;
+          } catch (x) { failed.push(`${p.bc.name}: ${x.message}`); }
+        }
+        if (!sent) { go.disabled = false; go.textContent = 'Send email'; return toast(failed[0], 'err'); }
+        rec.followTo = ''; rec.followList = bidders(rec).filter(b => b.sentAt).map(b => { const bc = byId('customers', b.customerId) || {}; return { to: bc.email || '', contact: firstOf(bc), customerId: b.customerId }; }).filter(x => x.to);
+        done(); return toast(failed.length ? `Sent ${sent}, ${failed.length} failed — ${failed[0]}` : `Sent ${sent} separate email${sent > 1 ? 's' : ''}`, failed.length ? 'err' : '');
+      }
+      const to = addrList(f.get('to')), cc = addrList(f.get('cc'));
       if (!to.length || ![...to, ...cc].every(isEmailAddr)) return toast('Check the email addresses', 'err');
       if (isP && sel && !sel.value) return toast('Choose who this proposal is for', 'err');
       go.disabled = true; go.textContent = 'Preparing…';
@@ -94,16 +120,15 @@ function openEmailDialog(kind, id) {
         const cust = byId('customers', custId);
         if (isP && cust && rec.customerId !== cust.id) rec.customerId = cust.id;      // assign before building the PDF so "Prepared for" is right
         const attachments = [];
-        if (f.get('pdf')) { go.textContent = 'Making PDF…'; attachments.push({ filename: safeFile(isP ? `Proposal - ${rec.title} - ${rec.createdAt}` : `Invoice ${rec.number}`) + '.pdf', content: await htmlToPdfBase64(isP ? proposalHTML(rec) : invoiceDocHTML(rec), 'document.pdf') }); }
+        if (f.get('pdf')) { go.textContent = 'Making PDF…'; attachments.push({ filename: pdfName, content: await htmlToPdfBase64(isP ? proposalHTML(rec) : invoiceDocHTML(rec), 'document.pdf') }); }
         go.textContent = 'Sending…';
         const url = f.get('link') && cust && cust.name !== 'Unassigned' ? portalURL(cust) : '';
-        await emailCall('send', { to, cc, subject: f.get('subject'), html: emailHTML(f.get('body'), url ? { label: isP ? 'Review & accept proposal' : 'View invoice', url } : null), attachments });
-        (rec.emails = rec.emails || []).push({ date: today(), to: to.join(', '), subject: f.get('subject'), kind: isP ? 'proposal' : 'invoice' });
-        rec.follow = !!f.get('follow'); rec.followTo = to.join(', ');
-        if (isP) { if (rec.status === 'draft') rec.status = 'sent'; rec.sentAt = today(); rec.followCount = 0; }
-        else { if (rec.status === 'draft') rec.status = 'sent'; rec.remindCount = 0; }
+        await emailCall('send', { to, cc, subject, html: emailHTML(body, url ? { label: isP ? 'Review & accept proposal' : 'View invoice', url } : null), attachments });
+        (rec.emails = rec.emails || []).push({ date: today(), to: to.join(', '), subject, kind: isP ? 'proposal' : 'invoice' });
+        rec.followTo = to.join(', '); delete rec.followList;
+        if (isP && bidders(rec).length === 1) bidders(rec)[0].sentAt = today();
         if (cust) { if (!cust.email) cust.email = to[0]; cust.activity.push({ date: today(), text: `Emailed ${isP ? 'proposal' : 'invoice'} #${rec.number} to ${to.join(', ')}` }); }
-        save(); closeModal(); render(); toast('Email sent');
+        done(); toast('Email sent');
       } catch (x) { go.disabled = false; go.textContent = 'Send email'; toast(x.message, 'err'); }
     };
   };
@@ -119,7 +144,7 @@ const numDays = (v, d) => { const a = addrList(v).map(Number).filter(n => n > 0)
 function followSchedule() {
   const f = followCfg(), days = numDays(f.days, [7, 21, 45]), idays = numDays(f.invoiceDays, [3, 14, 30]), t = today(), rows = [];
   DB.estimates.forEach(e => {
-    if (e.status !== 'sent' || !e.follow) return; const c = byId('customers', e.customerId), to = e.followTo || (c && c.email), k = +e.followCount || 0, start = e.sentAt || e.createdAt;
+    if (e.status !== 'sent' || !e.follow) return; const c = byId('customers', e.customerId), to = (e.followList && e.followList.length ? e.followList.map(x => x.to).join(' · ') : e.followTo) || (c && c.email), k = +e.followCount || 0, start = e.sentAt || e.createdAt;
     if (!to || k >= days.length) return; const on = addDays(start, days[k]); if (estAge({ createdAt: start }) > (+f.maxAge || 90)) return;
     rows.push({ kind: 'Proposal', label: `#${e.number} ${e.title}`, to, step: `Follow-up ${k + 1} of ${days.length}`, on, href: '#/estimates/' + e.id });
   });

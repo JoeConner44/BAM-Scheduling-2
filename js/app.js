@@ -1,6 +1,6 @@
 /* Router + global event wiring */
 const NAV = [
-  ['WIN WORK', [['crm', 'CRM', '👥'], ['estimates', 'Estimates & Proposals', '📐'], ['design', 'Proposal Design', '🎨']]],
+  ['WIN WORK', [['crm', 'CRM', '👥'], ['estimates', 'Estimates & Proposals', '📐'], ['bids', 'Bids', '🎯'], ['design', 'Proposal Design', '🎨']]],
   ['MANAGE JOBS', [['schedule', 'Scheduling & Dispatch', '🗓'], ['jobs', 'Job Sites', '🚧'], ['costing', 'Job Costing', '💲'], ['portal', 'Customer Portal', '🔗']]],
   ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['email', 'Email & Follow-ups', '✉️'], ['quickbooks', 'QuickBooks', '📒'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
 ];
@@ -39,6 +39,7 @@ document.addEventListener('change', e => {
   else if (el.dataset.pb) CHG.pb(el);
   else if (el.dataset.priv) CHG.priv(el);
   else if (el.dataset.em) CHG.em(el);
+  else if (el.dataset.cemail) CHG.cemail(el);
   else if (el.dataset.fu) CHG.fu(el);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
