@@ -48,6 +48,7 @@ async function isScheduler(req: Request): Promise<boolean> {
 }
 
 // ---------- sending ----------
+const isPayLink = (u: unknown) => typeof u === "string" && /^https:\/\/[^\s"<>]+$/.test(u);
 const isEmail = (s: string) => /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(s);
 const list = (v: unknown) => (Array.isArray(v) ? v : String(v || "").split(/[,;]/)).map((s) => String(s).trim()).filter(Boolean);
 type Mail = { to: string[]; cc?: string[]; subject: string; html: string; attachments?: { filename: string; content: string }[] };
@@ -148,7 +149,7 @@ async function runFollowups(dryRun: boolean) {
     out.due.push({ kind: "invoice", id: r.id, number: i.number, to, step: k + 1, late });
     if (dryRun) continue;
     try {
-      await sendMail({ to, subject, html: emailHTML(fill(tpl.reminderBody, vars), vars.link ? { label: "View invoice", url: vars.link } : null, settings, accent) });
+      await sendMail({ to, subject, html: emailHTML(fill(tpl.reminderBody, vars), isPayLink(i.payLink) ? { label: "Pay invoice online", url: i.payLink } : vars.link ? { label: "View invoice", url: vars.link } : null, settings, accent) });
       const data = { ...i, remindCount: k + 1, lastRemindAt: t, emails: [...(i.emails || []), { date: t, to: to.join(", "), subject, kind: `reminder ${k + 1}`, auto: true }] };
       await db(`records?coll=eq.invoices&id=eq.${encodeURIComponent(r.id)}`, { method: "PATCH", body: JSON.stringify({ data }) });
       out.sent++;

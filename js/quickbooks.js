@@ -74,6 +74,19 @@ async function qboPullPayments() {
   return res;
 }
 
+/* ---------- online payment links (QuickBooks Payments) ---------- */
+const isPayLink = u => typeof u === 'string' && /^https:\/\/[^\s"<>]+$/.test(u);
+async function qboFetchLink(i) {      // returns true when QuickBooks handed back a payment page for this invoice
+  const r = await qboCall('invoiceLink', { id: String(i.qboId) });
+  if (isPayLink(r.link)) { i.payLink = r.link; return true; }
+  i.payLinkChecked = today(); return false;
+}
+async function qboFetchLinks(max = 40) {
+  const list = DB.invoices.filter(i => i.qboId && !i.payLink && invBalance(i) > 0.005 && i.payLinkChecked !== today()).slice(0, max); let n = 0;
+  for (const i of list) { try { if (await qboFetchLink(i)) n++; } catch (x) { break; } }
+  if (list.length) qboLog(`Online payment links: ${n} of ${list.length} unpaid invoices have one`);
+  return { tried: list.length, got: n };
+}
 /* ---------- 3. send customers + invoices out ---------- */
 const qboReady = () => DB.invoices.filter(i => !i.qboId && i.status !== 'draft' && invTotal(i) > 0 && custName(i.customerId) !== 'Unassigned' && byId('customers', i.customerId));
 async function qboItems() { if (!QBO.items) QBO.items = await qboQuery("select * from Item where Type = 'Service' and Active = true"); return QBO.items; }
@@ -87,19 +100,26 @@ async function qboEnsureCustomer(c) {
   return (c.qboId = (await qboCall('create', { entity: 'Customer', data })).Customer.Id);
 }
 async function qboPush(list) {
-  const res = { sent: 0, failed: [] }, itemId = qboCfg().itemId;
+  const res = { sent: 0, failed: [], notes: [], links: 0 }, itemId = qboCfg().itemId;
   if (!itemId) throw new Error('Choose which QuickBooks product/service to use for invoice lines first');
   for (const i of list) {
     try {
       const c = byId('customers', i.customerId), cid = await qboEnsureCustomer(c), job = i.jobId && byId('jobs', i.jobId);
       const data = { CustomerRef: { value: cid }, TxnDate: i.issued, DueDate: i.due, PrivateNote: `From AsphaltPro invoice #${i.number}${job ? ' — ' + job.name : ''}`,
         Line: i.items.filter(l => (+l.qty || 0) * (+l.price || 0) !== 0).map(l => ({ DetailType: 'SalesItemLineDetail', Amount: Math.round((+l.qty || 0) * (+l.price || 0) * 100) / 100, Description: String(l.desc || '').slice(0, 4000), SalesItemLineDetail: { ItemRef: { value: itemId }, Qty: +l.qty || 1, UnitPrice: +l.price || 0 } })) };
-      const q = (await qboCall('create', { entity: 'Invoice', data })).Invoice;
+      let q;
+      if (qboCfg().onlinePay !== false && c.email) {      // let the customer pay this invoice online through QuickBooks Payments
+        try { q = (await qboCall('create', { entity: 'Invoice', data: { ...data, BillEmail: { Address: c.email.split(/[,;]/)[0].trim() }, AllowOnlineCreditCardPayment: true, AllowOnlineACHPayment: true } })).Invoice; }
+        catch (x) { res.notes.push(`#${i.number}: created without online payment (${x.message})`); }
+      }
+      if (!q) q = (await qboCall('create', { entity: 'Invoice', data })).Invoice;
       i.qboId = q.Id; if (q.DocNumber) i.number = /^\d+$/.test(q.DocNumber) ? +q.DocNumber : q.DocNumber; res.sent++;
+      try { if (await qboFetchLink(i)) res.links++; } catch (x) { /* link can be fetched later from the QuickBooks page */ }
       save();   // keep the link even if a later invoice fails, so nothing is ever sent twice
     } catch (x) { res.failed.push(`#${i.number}: ${x.message}`); }
   }
-  qboLog(`Sent ${res.sent} invoices to QuickBooks${res.failed.length ? `, ${res.failed.length} failed: ${res.failed.join('; ')}` : ''}`);
+  if (res.notes.length) qboLog(res.notes.join('; '));
+  qboLog(`Sent ${res.sent} invoices to QuickBooks (${res.links} with an online payment link)${res.failed.length ? `, ${res.failed.length} failed: ${res.failed.join('; ')}` : ''}`);
   return res;
 }
 
@@ -126,7 +146,8 @@ VIEWS.quickbooks = args => {
         <label class="block"><span>QuickBooks product/service to use for invoice lines</span><select id="qboItem"><option value="">— choose —</option>${(QBO.items || []).map(i => `<option value="${esc(i.Id)}" ${i.Id === c.itemId ? 'selected' : ''}>${esc(i.FullyQualifiedName || i.Name)}</option>`).join('')}</select></label>
         ${ready.length ? `<table>${ready.slice(0, 8).map(i => `<tr><td>#${esc(i.number)}</td><td>${esc(custName(i.customerId))}</td><td class="num">${money2(invTotal(i))}</td></tr>`).join('')}${ready.length > 8 ? `<tr><td colspan="3" class="muted">…and ${ready.length - 8} more</td></tr>` : ''}</table>
         <button class="btn primary" style="margin-top:10px" data-act="qboSend" ${busy}>Send ${ready.length} invoice${ready.length > 1 ? 's' : ''} (${money(ready.reduce((a, i) => a + invTotal(i), 0))}) to QuickBooks</button>` : '<p><b>Nothing waiting.</b> Invoices marked “sent” here that are not yet in QuickBooks will be listed.</p>'}
-        <p class="hint">Draft invoices and invoices for the “Unassigned” customer are never sent. Sales tax is left for QuickBooks to work out.</p></div>
+        <label class="check"><input type="checkbox" id="qboOnline" ${c.onlinePay !== false ? 'checked' : ''}> Let customers pay these online (card / bank) through QuickBooks Payments</label>
+        <p class="hint">Draft invoices and invoices for the “Unassigned” customer are never sent. Sales tax is left for QuickBooks to work out. ${DB.invoices.filter(i => i.payLink).length} invoices have an online payment link.</p></div>
     </div>
     <div class="card"><h3>Activity</h3>${(c.log || []).length ? `<ul class="timeline">${c.log.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : '<p class="muted">No sync yet.</p>'}</div>`;
   return {
@@ -135,6 +156,7 @@ VIEWS.quickbooks = args => {
       if (!st && !QBO.err) qboRefresh();
       const s = $('#qboSince'); if (s) s.onchange = () => { qboCfg().since = s.value; save(); };
       const it = $('#qboItem'); if (it) it.onchange = () => { qboCfg().itemId = it.value; save(); };
+      const on = $('#qboOnline'); if (on) on.onchange = () => { qboCfg().onlinePay = on.checked; save(); };
     }
   };
 };
@@ -156,6 +178,6 @@ ACT.qboRefresh = () => { QBO.status = null; QBO.err = ''; render(); };
 ACT.qboConnect = async () => { try { location.href = (await qboCall('authUrl')).url; } catch (x) { toast(x.message, 'err'); } };
 ACT.qboDisconnect = () => confirmBox('Disconnect QuickBooks? Links on customers and invoices are kept, so you can reconnect later without duplicates.', async () => { try { await qboCall('disconnect'); qboLog('Disconnected'); save(); QBO = { status: null, items: null, busy: false, err: '' }; render(); } catch (x) { toast(x.message, 'err'); } });
 ACT.qboImport = () => qboRun('Import', async () => { const r = await qboImport(); return `Imported ${r.customers} customers and ${r.invoices} invoices`; });
-ACT.qboPay = () => qboRun('Payment pull', async () => { const r = await qboPullPayments(); return `${r.payments + r.adjusted} payments applied — ${r.paid} invoices now paid`; });
-ACT.qboSyncAll = () => qboRun('Sync', async () => { const a = await qboImport(), b = await qboPullPayments(); return `Synced: ${a.customers} customers, ${a.invoices} invoices, ${b.payments + b.adjusted} payments`; });
+ACT.qboPay = () => qboRun('Payment pull', async () => { const r = await qboPullPayments(), l = await qboFetchLinks(); return `${r.payments + r.adjusted} payments applied — ${r.paid} invoices now paid${l.tried ? ` · ${l.got} payment links` : ''}`; });
+ACT.qboSyncAll = () => qboRun('Sync', async () => { const a = await qboImport(), b = await qboPullPayments(); await qboFetchLinks(); return `Synced: ${a.customers} customers, ${a.invoices} invoices, ${b.payments + b.adjusted} payments`; });
 ACT.qboSend = () => { const list = qboReady(); if (!qboCfg().itemId) return toast('Choose the QuickBooks product/service for invoice lines first', 'err'); confirmBox(`Create ${list.length} invoice${list.length > 1 ? 's' : ''} totalling ${money(list.reduce((a, i) => a + invTotal(i), 0))} in QuickBooks? This writes to your real books.`, () => qboRun('Send', async () => { const r = await qboPush(list); if (r.failed.length) throw new Error(`${r.sent} sent, ${r.failed.length} failed — ${r.failed[0]}`); return `Sent ${r.sent} invoices to QuickBooks`; })); };

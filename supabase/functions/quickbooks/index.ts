@@ -143,6 +143,14 @@ Deno.serve(async (req) => {
       const r = await qbo("GET", `query?query=${encodeURIComponent(q)}`);
       return r.ok ? json(r.data) : json({ error: r.error, code: r.code }, 502);
     }
+    if (action === "invoiceLink") {      // the customer-facing "pay online" page QuickBooks hosts for one invoice
+      const id = String(body.id || "");
+      if (!/^\d+$/.test(id)) return fail("Bad invoice id");
+      const r = await qbo("GET", `invoice/${id}?include=invoiceLink`);
+      if (!r.ok) return json({ error: r.error, code: r.code }, 502);
+      const inv = r.data?.Invoice || {};
+      return json({ link: inv.InvoiceLink || null, balance: inv.Balance ?? null, onlineCard: !!inv.AllowOnlineCreditCardPayment, onlineAch: !!inv.AllowOnlineACHPayment, billEmail: inv.BillEmail?.Address || null });
+    }
     if (action === "create") {           // create one Customer / Invoice / Payment / Item
       const entity = String(body.entity || "").toLowerCase();
       if (!ENTITIES.includes(entity) || typeof body.data !== "object" || !body.data) return fail("Unsupported entity");

@@ -78,7 +78,7 @@ function openEmailDialog(kind, id) {
       <label class="wide"><span>Subject</span><input name="subject" required value="${esc(fillTpl(isP ? t.proposalSubject : t.invoiceSubject, v))}"></label>
       <label class="wide"><span>Message${multi ? ' — {{contact}} becomes each person’s first name' : ''}</span><textarea name="body" rows="9" required>${esc(fillTpl(isP ? t.proposalBody : t.invoiceBody, v))}</textarea></label></div>
       <label class="check"><input type="checkbox" name="pdf" checked> Attach the ${isP ? 'proposal' : 'invoice'} as a PDF</label>
-      ${multi ? '' : `<label class="check"><input type="checkbox" name="link" ${v.link ? 'checked' : 'disabled'}> Include a button to ${isP ? 'review and sign' : 'view it'} online ${v.link ? '' : '<small>(choose a customer first)</small>'}</label>`}
+      ${multi ? '' : `<label class="check"><input type="checkbox" name="link" ${v.link || (!isP && isPayLink(rec.payLink)) ? 'checked' : 'disabled'}> Include a button to ${isP ? 'review and sign' : isPayLink(rec.payLink) ? 'pay it' : 'view it'} online ${!isP && isPayLink(rec.payLink) ? '<small>(QuickBooks payment page)</small>' : v.link ? (isP ? '' : '<small>(send it to QuickBooks first to get a pay-online button)</small>') : '<small>(choose a customer first)</small>'}</label>`}
       <label class="check"><input type="checkbox" name="follow" ${rec.follow === false ? '' : 'checked'}> Send automatic ${isP ? 'follow-ups while this proposal is still open' : 'reminders if this invoice goes past due'}</label>
       <p class="hint">Sent from your company email address; replies go to your office inbox.${followCfg().enabled ? '' : ' Automatic follow-ups are switched off — turn them on under Email & Follow-ups.'}</p>
       <div class="actions"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn primary" id="emGo">Send email</button></div></form>`, { wide: true });
@@ -123,7 +123,7 @@ function openEmailDialog(kind, id) {
         if (f.get('pdf')) { go.textContent = 'Making PDF…'; attachments.push({ filename: pdfName, content: await htmlToPdfBase64(isP ? proposalHTML(rec) : invoiceDocHTML(rec), 'document.pdf') }); }
         go.textContent = 'Sending…';
         const url = f.get('link') && cust && cust.name !== 'Unassigned' ? portalURL(cust) : '';
-        await emailCall('send', { to, cc, subject, html: emailHTML(body, url ? { label: isP ? 'Review & accept proposal' : 'View invoice', url } : null), attachments });
+        await emailCall('send', { to, cc, subject, html: emailHTML(body, !isP && f.get('link') && isPayLink(rec.payLink) ? { label: 'Pay invoice online', url: rec.payLink } : url ? { label: isP ? 'Review & accept proposal' : 'View invoice', url } : null), attachments });
         (rec.emails = rec.emails || []).push({ date: today(), to: to.join(', '), subject, kind: isP ? 'proposal' : 'invoice' });
         rec.followTo = to.join(', '); delete rec.followList;
         if (isP && bidders(rec).length === 1) bidders(rec)[0].sentAt = today();
