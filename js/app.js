@@ -37,6 +37,7 @@ document.addEventListener('change', e => {
   else if (el.dataset.set) CHG.set(el);
   else if (el.dataset.svc) CHG.svc(el);
   else if (el.dataset.pb) CHG.pb(el);
+  else if (el.dataset.priv) CHG.priv(el);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 window.addEventListener('hashchange', () => { if (CLOUD && isPortalHash() !== !!PORTAL) return location.reload(); closeModal(); if (DB) render(); window.scrollTo(0, 0); });

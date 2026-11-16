@@ -223,6 +223,7 @@ VIEWS.settings = () => ({
   title: 'Settings', html: `<div class="card"><h3>Company</h3><div class="grid4">${[['company', 'Company name'], ['phone', 'Phone'], ['email', 'Email'], ['address', 'Address']].map(([k, l]) => `<label><span>${l}</span><input data-set="${k}" value="${esc(DB.settings[k])}"></label>`).join('')}</div>
   <label class="block"><span>Default proposal terms</span><textarea rows="4" data-set="terms">${esc(DB.settings.terms)}</textarea></label></div>
   ${pbCardHTML()}
+  ${imageryCardHTML()}
   <div class="card"><h3>Proposal design</h3><p class="muted">Logo, colors, wording and layout of the proposals your customers see.</p><a class="btn primary" href="#/design">🎨 Open the proposal designer</a></div>
   ${DB.estimates.some(e => e.rows.length) ? `  <div class="card"><h3>Price list <button class="btn sm" data-act="addSvc">+ Service</button></h3><table class="edit"><tr><th>Service</th><th>Unit</th><th>Price / unit</th><th></th></tr>${DB.settings.services.map(s => `<tr><td><input data-svc="${s.id}" data-f="name" value="${esc(s.name)}"></td><td><select data-svc="${s.id}" data-f="unit">${Object.keys(UNIT_LABEL).map(u => `<option ${u === s.unit ? 'selected' : ''}>${u}</option>`).join('')}</select></td><td><input class="n" type="number" step="0.01" data-svc="${s.id}" data-f="price" value="${s.price}"></td><td><button class="ico" data-act="delSvc" data-id="${s.id}">×</button></td></tr>`).join('')}</table><p class="hint">ton = priced per ton (area × depth); sqft = per square foot; lf = per linear foot; ea = each.</p></div>
 ` : ''}

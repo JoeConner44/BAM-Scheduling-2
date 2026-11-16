@@ -25,12 +25,13 @@ function openTakeoff(e) {
       <div class="tabs" id="tkType">${Object.keys(KIND_UNIT).map(t => `<button type="button" data-t="${t}">${KIND_ICON[t]} ${{ area: 'Area', line: 'Length', count: 'Count' }[t]}</button>`).join('')}</div></div>
     <div class="tkstep"><span>2 · Click on the map</span><p class="hint" id="tkHelp"></p>
       <div class="btns"><button class="btn sm primary" id="tkFinish">Finish shape ⏎</button><button class="btn sm" id="tkUndo">Undo</button><label class="check sm"><input type="checkbox" id="tkLabels" checked> Street labels</label></div></div>
+    ${priv().googleKey ? `<div class="tkstep"><span>Imagery</span><div class="tabs" id="tkImg"><button type="button" data-i="esri">Esri</button><button type="button" data-i="google">Google</button></div></div>` : ''}
     <div class="tklist" id="tkList"></div>
     <div class="tkfoot"><button class="btn primary" id="tkSave">Save to proposal</button></div>
   </aside><div id="tkmap"></div><div class="tklive" id="tkLive"></div>`;
   document.body.appendChild(d); document.body.classList.add('tk-open');
   const map = TK.map = L.map('tkmap', { doubleClickZoom: false, zoomSnap: 0.5, maxZoom: 22 }).setView(saved.center || [33.95, -83.38], saved.zoom || (saved.center ? 19 : 11));
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }).addTo(map);
+  tkSetImagery(priv().googleKey && priv().imagery === 'google' ? 'google' : 'esri');
   TK.labelLayer = L.layerGroup([
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, opacity: .8 }),
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22 })]).addTo(map);
@@ -42,6 +43,7 @@ function openTakeoff(e) {
   $('#tkType').onclick = ev => { const b = ev.target.closest('[data-t]'); if (b) tkSetType(b.dataset.t); };
   $('#tkFinish').onclick = () => tkFinish(); $('#tkUndo').onclick = tkUndo; $('#tkSave').onclick = tkSave; $('#tkClose').onclick = () => tkClose(false);
   $('#tkLabels').onchange = ev => { ev.target.checked ? TK.labelLayer.addTo(map) : map.removeLayer(TK.labelLayer); };
+  if ($('#tkImg')) $('#tkImg').onclick = ev => { const b = ev.target.closest('[data-i]'); if (b) { priv().imagery = b.dataset.i; save(); tkSetImagery(b.dataset.i); } };
   $('#tkList').onclick = tkListClick; $('#tkList').onchange = tkListChange;
   document.addEventListener('keydown', tkKey, true);
   tkSetType('area'); tkDraw();
@@ -145,3 +147,41 @@ function tkClose(force) {
   if (!force && (TK.dirty || TK.cur.pts.length) && !confirm('Close without saving this take-off?')) return;
   document.removeEventListener('keydown', tkKey, true); TK.map.remove(); $('#tk').remove(); document.body.classList.remove('tk-open'); TK = null;
 }
+
+/* ---------- imagery sources: Esri (free, no key) or Google Map Tiles API (your own key) ---------- */
+let TKG = null;   // cached Google tile session
+async function googleSession(key) {
+  if (TKG && TKG.key === key && TKG.exp > Date.now() / 1000 + 3600) return TKG.token;
+  if (!key) throw new Error('no key entered');
+  const r = await fetch('https://tile.googleapis.com/v1/createSession?key=' + encodeURIComponent(key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mapType: 'satellite', language: 'en-US', region: 'US' }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.session) throw new Error((j.error && j.error.message) || 'Google did not accept the key');
+  TKG = { key, token: j.session, exp: +j.expiry || Date.now() / 1000 + 86400 }; return j.session;
+}
+async function tkSetImagery(kind) {
+  const map = TK.map; if (TK.base) map.removeLayer(TK.base); TK.base = null; map.off('moveend', tkGoogleAttr);
+  const mark = k => $$('#tkImg button').forEach(b => b.classList.toggle('on', b.dataset.i === k));
+  mark(kind);
+  if (kind === 'google') {
+    try {
+      const key = priv().googleKey, tok = await googleSession(key); if (!TK || TK.map !== map) return;
+      TK.base = L.tileLayer(`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${encodeURIComponent(tok)}&key=${encodeURIComponent(key)}`, { maxNativeZoom: 20, maxZoom: 22, attribution: '<b>Google</b> <span id="tkGAttr">Imagery ©Google</span>' }).addTo(map);
+      TK.base.bringToBack(); map.on('moveend', tkGoogleAttr); tkGoogleAttr(); return;
+    } catch (x) { toast('Google imagery unavailable: ' + x.message + ' — using Esri instead', 'err'); if (!TK || TK.map !== map) return; mark('esri'); }
+  }
+  TK.base = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }).addTo(map);
+  TK.base.bringToBack();
+}
+let tkGTimer = null;
+function tkGoogleAttr() {   // Google requires showing the copyright for the area in view
+  clearTimeout(tkGTimer); tkGTimer = setTimeout(async () => {
+    if (!TK || !TKG) return; const b = TK.map.getBounds(), z = Math.min(22, Math.round(TK.map.getZoom()));
+    try { const j = await (await fetch(`https://tile.googleapis.com/tile/v1/viewport?session=${encodeURIComponent(TKG.token)}&key=${encodeURIComponent(TKG.key)}&zoom=${z}&north=${b.getNorth()}&south=${b.getSouth()}&east=${b.getEast()}&west=${b.getWest()}`)).json(); const el = $('#tkGAttr'); if (el && j.copyright) el.textContent = j.copyright; } catch (x) { /* keep default attribution */ }
+  }, 600);
+}
+CHG.priv = el => { priv()[el.dataset.priv] = el.value.trim(); TKG = null; save(); };
+ACT.googleTest = async () => { try { await googleSession(priv().googleKey || ''); priv().imagery = 'google'; save(); toast('Google key works — Google imagery is now the default in the take-off'); render(); } catch (x) { toast('Google said: ' + x.message, 'err'); } };
+const imageryCardHTML = () => `<div class="card"><h3>Satellite imagery</h3><p class="muted" style="margin-top:0">The take-off uses free Esri aerial photos by default. Add your own Google Maps key to switch to Google’s imagery (you can flip between the two inside the take-off).</p>
+  <div class="grid2"><label class="wide"><span>Google Maps API key (Map Tiles API)</span><input data-priv="googleKey" value="${esc(priv().googleKey || '')}" placeholder="AIza…" autocomplete="off"></label></div>
+  <div class="btns" style="margin-top:8px"><button class="btn primary" data-act="googleTest">Test key &amp; use Google</button>${priv().googleKey ? `<span class="muted">Default imagery: <b>${priv().imagery === 'google' ? 'Google' : 'Esri'}</b></span>` : ''}</div>
+  <p class="hint">The key is stored with your staff settings and is never sent to customer portals. Restrict it in Google Cloud to this website’s address and to the Map Tiles API.</p></div>`;

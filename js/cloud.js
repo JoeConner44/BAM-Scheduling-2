@@ -12,13 +12,13 @@ if (CLOUD) SB = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKe
 const flatten = db => {
   const m = {};
   COLLS.forEach(c => (db[c] || []).forEach(x => { m[c + '|' + x.id] = JSON.stringify(x); }));
-  m['meta|settings'] = JSON.stringify(db.settings); m['meta|seq'] = JSON.stringify(db.seq);
+  m['meta|settings'] = JSON.stringify(db.settings); m['meta|seq'] = JSON.stringify(db.seq); m['meta|private'] = JSON.stringify(db.private || {});
   return m;
 };
 function rowsToDB(rows) {
   const meta = Object.fromEntries(rows.filter(r => r.coll === 'meta').map(r => [r.id, r.data]));
   if (!meta.settings) return null;
-  const db = { v: 1, settings: meta.settings, seq: meta.seq || { est: 1000, inv: 2000 } };
+  const db = { v: 1, settings: meta.settings, seq: meta.seq || { est: 1000, inv: 2000 }, private: meta.private || {} };
   COLLS.forEach(c => { db[c] = rows.filter(r => r.coll === c).map(r => r.data); });
   return db;
 }
@@ -59,7 +59,7 @@ const canon = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Ar
 function applyRow(r) {
   const key = r.coll + '|' + r.id;
   if (snap[key] && canon(JSON.parse(snap[key])) === canon(r.data)) return false;   // our own save coming back
-  if (r.coll === 'meta') { if (r.id === 'settings') DB.settings = r.data; else if (r.id === 'seq') DB.seq = r.data; }
+  if (r.coll === 'meta') { if (r.id === 'settings') DB.settings = r.data; else if (r.id === 'seq') DB.seq = r.data; else if (r.id === 'private') DB.private = r.data; }
   else if (COLLS.includes(r.coll)) { const arr = DB[r.coll], i = arr.findIndex(x => x.id === r.id); if (i >= 0) arr[i] = r.data; else arr.push(r.data); }
   snap[key] = JSON.stringify(r.data); return true;
 }

@@ -92,6 +92,7 @@ function invStatus(i) {
 const jobCost = j => j.costs.reduce((a, c) => a + (+c.amount || 0), 0);
 const jobBudget = j => Object.values(j.budget).reduce((a, b) => a + (+b || 0), 0);
 const jobContract = j => { const e = byId('estimates', j.estimateId); return e ? estTotals(e).total : (+j.contract || 0); };
+const priv = () => DB.private || (DB.private = {});   // staff-only settings (API keys); synced as its own record, not exposed to portals
 const byId = (coll, id) => DB[coll].find(x => x.id === id);
 const custName = id => (byId('customers', id) || { name: '(deleted)' }).name;
 const nextNum = k => ++DB.seq[k];
