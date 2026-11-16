@@ -22,6 +22,16 @@ Data is saved in your browser (localStorage). Use **Settings → Export JSON** t
 | **Invoicing & Payments** | Invoice from job balance, send, record card/ACH/check payments, overdue tracking |
 | **Automation** | Rules + inbox: signed proposal → create job & alert owner, job complete → draft invoice, budget threshold & overdue alerts, new-lead alerts |
 
+## QuickBooks Online
+The **QuickBooks** page (left menu) lets a bookkeeper connect a QuickBooks Online company, bring customers and invoices in, pull payments so invoices here show as paid, and send invoices out. It needs the shared backend plus a one-time setup:
+
+1. **Database:** run [`supabase/quickbooks.sql`](supabase/quickbooks.sql) in the Supabase SQL Editor.
+2. **Intuit app:** at developer.intuit.com create an app with the *Accounting* scope. Add the redirect URI `https://<your-project>.supabase.co/functions/v1/quickbooks`. Development keys only connect to Intuit sandbox companies; a real company needs the app's *Production* keys.
+3. **Connector:** in Supabase → Edge Functions create a function named `quickbooks`, paste in [`supabase/functions/quickbooks/index.ts`](supabase/functions/quickbooks/index.ts), and turn **Verify JWT off** (the function checks the caller is on the staff list itself). Set secrets `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `QBO_ENV` (`production` or `sandbox`) and `APP_URL` (this site's address, ending in `/`).
+4. Open the QuickBooks page and click **Connect QuickBooks**.
+
+QuickBooks tokens are stored in a table only the connector can read. Sending invoices is always a separate, confirmed step; syncing *from* QuickBooks never changes your books.
+
 ## Importing existing projects
 *Settings → Import projects file* merges a prepared JSON file of customers, proposals and jobs into your data. It never overwrites or duplicates (each project has a key), and creates no alerts or invoices. Keep these files out of the repository — they contain customer data.
 

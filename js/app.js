@@ -2,7 +2,7 @@
 const NAV = [
   ['WIN WORK', [['crm', 'CRM', '👥'], ['estimates', 'Estimates & Proposals', '📐'], ['design', 'Proposal Design', '🎨']]],
   ['MANAGE JOBS', [['schedule', 'Scheduling & Dispatch', '🗓'], ['jobs', 'Job Sites', '🚧'], ['costing', 'Job Costing', '💲'], ['portal', 'Customer Portal', '🔗']]],
-  ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
+  ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['quickbooks', 'QuickBooks', '📒'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
 ];
 function route() { const [, name = 'dashboard', ...args] = location.hash.split('/'); return { name, args }; }
 VIEWS.p = () => VIEWS.portal([DB.customers[0].id]);

@@ -143,3 +143,4 @@ body.tk-open{overflow:hidden}#tk{position:fixed;inset:0;z-index:60;display:flex;
 @media (max-width:860px){.designer{grid-template-columns:1fr}.dpv{position:static;max-height:none}#tk{flex-direction:column}.tkside{width:auto;max-height:46vh;border-right:0;border-bottom:1px solid var(--line)}.tklive{left:50%;top:auto;bottom:14px}}
 @media print{.dctl,.dpvbar{display:none!important}.designer{display:block}.dpv{position:static;max-height:none;overflow:visible}}
 .proposal .terms-text{font-size:inherit}
+.banner{padding:10px 14px;border-radius:8px;margin-bottom:14px;font-weight:600}.banner.ok{background:#dcfce7;color:#166534}.banner.bad{background:#fee2e2;color:#991b1b}
