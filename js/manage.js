@@ -222,7 +222,10 @@ ACT.portalPay = el => {
 VIEWS.settings = () => ({
   title: 'Settings', html: `<div class="card"><h3>Company</h3><div class="grid4">${[['company', 'Company name'], ['phone', 'Phone'], ['email', 'Email'], ['address', 'Address']].map(([k, l]) => `<label><span>${l}</span><input data-set="${k}" value="${esc(DB.settings[k])}"></label>`).join('')}</div>
   <label class="block"><span>Default proposal terms</span><textarea rows="4" data-set="terms">${esc(DB.settings.terms)}</textarea></label></div>
-  <div class="card"><h3>Price list <button class="btn sm" data-act="addSvc">+ Service</button></h3><table class="edit"><tr><th>Service</th><th>Unit</th><th>Price / unit</th><th></th></tr>${DB.settings.services.map(s => `<tr><td><input data-svc="${s.id}" data-f="name" value="${esc(s.name)}"></td><td><select data-svc="${s.id}" data-f="unit">${Object.keys(UNIT_LABEL).map(u => `<option ${u === s.unit ? 'selected' : ''}>${u}</option>`).join('')}</select></td><td><input class="n" type="number" step="0.01" data-svc="${s.id}" data-f="price" value="${s.price}"></td><td><button class="ico" data-act="delSvc" data-id="${s.id}">×</button></td></tr>`).join('')}</table><p class="hint">ton = priced per ton (area × depth); sqft = per square foot; lf = per linear foot; ea = each.</p></div>
+  ${pbCardHTML()}
+  <div class="card"><h3>Proposal design</h3><p class="muted">Logo, colors, wording and layout of the proposals your customers see.</p><a class="btn primary" href="#/design">🎨 Open the proposal designer</a></div>
+  ${DB.estimates.some(e => e.rows.length) ? `  <div class="card"><h3>Price list <button class="btn sm" data-act="addSvc">+ Service</button></h3><table class="edit"><tr><th>Service</th><th>Unit</th><th>Price / unit</th><th></th></tr>${DB.settings.services.map(s => `<tr><td><input data-svc="${s.id}" data-f="name" value="${esc(s.name)}"></td><td><select data-svc="${s.id}" data-f="unit">${Object.keys(UNIT_LABEL).map(u => `<option ${u === s.unit ? 'selected' : ''}>${u}</option>`).join('')}</select></td><td><input class="n" type="number" step="0.01" data-svc="${s.id}" data-f="price" value="${s.price}"></td><td><button class="ico" data-act="delSvc" data-id="${s.id}">×</button></td></tr>`).join('')}</table><p class="hint">ton = priced per ton (area × depth); sqft = per square foot; lf = per linear foot; ea = each.</p></div>
+` : ''}
   <div class="card"><h3>Your data</h3><p class="muted">Everything lives in this browser’s storage. Export a backup, or move it to another device.</p><div class="btns"><button class="btn" data-act="exportData">⬇ Export JSON</button><label class="btn primary">⬆ Import projects file<input type="file" id="projIn" accept="application/json" hidden></label><label class="btn">⬆ Restore full backup<input type="file" id="importIn" accept="application/json" hidden></label><button class="btn danger ghost" data-act="resetData">Reset to demo data</button><button class="btn danger ghost" data-act="clearData">Start empty</button></div></div>`,
   mount() { $('#projIn').onchange = async e => { try { previewProjectImport(JSON.parse(await e.target.files[0].text())); } catch (x) { toast('Not a valid projects file', 'err'); } };
     $('#importIn').onchange = async e => { try { const d = JSON.parse(await e.target.files[0].text()); if (d.v !== 1) throw 0; DB = d; save(); render(); toast('Imported'); } catch (x) { toast('Not a valid export file', 'err'); } }; }
@@ -240,15 +243,17 @@ ACT.clearData = () => confirmBox('Delete ALL data and start with an empty compan
            signedDate, status: draft|sent|signed|declined, job?: { status, date, completedAt }, lines?: [], notes?, driveUrl? }] } */
 const normName = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 function previewProjectImport(f) {
-  if (!f || f.asphaltproImport !== 1 || !Array.isArray(f.projects)) return toast('Not a valid projects file', 'err');
+  if (!f || f.asphaltproImport !== 1) return toast('Not a valid projects file', 'err');
+  f.projects = Array.isArray(f.projects) ? f.projects : [];
+  const newPB = (f.priceBook || []).filter(p => p.name && !pbFind(p.name));
   const haveKeys = new Set(DB.estimates.map(e => e.importKey).filter(Boolean)), haveCust = new Set(DB.customers.map(c => normName(c.name)));
   const fresh = f.projects.filter(p => p.key && !haveKeys.has(p.key)), newCust = [...new Set(fresh.map(p => normName(p.customer)))].filter(n => n && !haveCust.has(n));
   const jobs = fresh.filter(p => p.job).length, tot = fresh.reduce((a, p) => a + (+p.total || 0), 0);
-  modal(`<h3>Import projects</h3><table><tr><td>New proposals</td><td class="num"><b>${fresh.length}</b></td></tr><tr><td>…of which become jobs</td><td class="num"><b>${jobs}</b></td></tr><tr><td>New customers</td><td class="num"><b>${newCust.length}</b></td></tr><tr><td>Total value</td><td class="num"><b>${money(tot)}</b></td></tr><tr><td>Already imported (skipped)</td><td class="num">${f.projects.length - fresh.length}</td></tr></table>
+  modal(`<h3>Import projects</h3><table><tr><td>New proposals</td><td class="num"><b>${fresh.length}</b></td></tr><tr><td>…of which become jobs</td><td class="num"><b>${jobs}</b></td></tr><tr><td>New customers</td><td class="num"><b>${newCust.length}</b></td></tr><tr><td>Total value</td><td class="num"><b>${money(tot)}</b></td></tr>${f.priceBook ? `<tr><td>New price book items</td><td class="num"><b>${newPB.length}</b></td></tr>` : ''}<tr><td>Already imported (skipped)</td><td class="num">${f.projects.length - fresh.length}</td></tr></table>
   ${f.settings ? `<label class="check"><input type="checkbox" id="impSet" checked> Also update company info and default proposal terms</label>` : ''}
   <p class="hint">Nothing existing is changed or deleted. No alerts or invoices are created for imported records.</p>
-  <div class="actions"><button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" id="impGo" ${fresh.length || f.settings ? '' : 'disabled'}>Import</button></div>`);
-  $('#impGo').onclick = () => { const withSet = $('#impSet') && $('#impSet').checked; closeModal(); applyProjectImport(fresh, withSet ? f.settings : null); };
+  <div class="actions"><button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" id="impGo" ${fresh.length || f.settings || newPB.length ? '' : 'disabled'}>Import</button></div>`);
+  $('#impGo').onclick = () => { const withSet = $('#impSet') && $('#impSet').checked; closeModal(); newPB.forEach(p => priceBook().push({ id: uid('pb'), name: String(p.name).trim(), unit: p.unit || 'EA', price: +p.price || 0 })); applyProjectImport(fresh, withSet ? f.settings : null); };
 }
 function applyProjectImport(projects, settings) {
   if (settings) Object.assign(DB.settings, settings);

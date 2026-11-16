@@ -1,6 +1,6 @@
 /* Router + global event wiring */
 const NAV = [
-  ['WIN WORK', [['crm', 'CRM', '👥'], ['estimates', 'Estimates & Proposals', '📐']]],
+  ['WIN WORK', [['crm', 'CRM', '👥'], ['estimates', 'Estimates & Proposals', '📐'], ['design', 'Proposal Design', '🎨']]],
   ['MANAGE JOBS', [['schedule', 'Scheduling & Dispatch', '🗓'], ['jobs', 'Job Sites', '🚧'], ['costing', 'Job Costing', '💲'], ['portal', 'Customer Portal', '🔗']]],
   ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
 ];
@@ -20,6 +20,7 @@ function render() {
   $('#bell').innerHTML = `🔔${unread ? `<b class="pill">${unread}</b>` : ''}`;
   $('#main').innerHTML = out.html;
   document.title = out.title + ' · AsphaltPro';
+  pbDatalist();
   if (out.mount) out.mount();
 }
 
@@ -35,6 +36,7 @@ document.addEventListener('change', e => {
   else if (el.dataset.rule) CHG.rule(el);
   else if (el.dataset.set) CHG.set(el);
   else if (el.dataset.svc) CHG.svc(el);
+  else if (el.dataset.pb) CHG.pb(el);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 window.addEventListener('hashchange', () => { if (CLOUD && isPortalHash() !== !!PORTAL) return location.reload(); closeModal(); if (DB) render(); window.scrollTo(0, 0); });

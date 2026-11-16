@@ -13,7 +13,7 @@ Data is saved in your browser (localStorage). Use **Settings → Export JSON** t
 | Area | What it does |
 |---|---|
 | **CRM** | Leads → prospects → customers, contact info, activity log, per-customer estimates/jobs/invoices |
-| **Mapping, Estimates & Proposals** | Spreadsheet-style item grid (paste from Excel, Enter/arrow navigation, section headings), Excel proposal import, lump-sum toggle that hides unit prices from the customer, satellite map measuring, printable proposal, e-signature. Open proposals are colour-coded by age (green ≤90 days, yellow 90–180, red older) and filterable by colour and date |
+| **Mapping, Estimates & Proposals** | **Satellite take-off**: draw areas, lengths and counts on aerial imagery, tied to price-book items, saved with the estimate and pushed into the proposal. **Price book** that auto-fills units/prices and can be learned from your Excel proposals. Spreadsheet-style item grid (paste from Excel, section headings), Excel import, lump-sum toggle. **Proposal designer** (logo, colours, fonts, layout, wording) with live preview, e-signature. Open proposals colour-coded by age and filterable |
 | **Scheduling & Dispatch** | Drag-and-drop week board by crew, multi-day jobs, unscheduled tray, day dispatch sheet (print/copy for crews) |
 | **Job Sites** | Mobile-friendly job page: start/complete, daily logs (weather, crew, tons), checklists, photos |
 | **Job Costing** | Budget vs actual by material/labor/equipment/other, live margin, cross-job costing table |

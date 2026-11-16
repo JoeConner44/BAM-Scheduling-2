@@ -159,12 +159,12 @@ function estimateEditor(e) {
     <td><input type="number" step="0.01" class="n" data-r="${r.id}" data-f="price" value="${r.price === null ? '' : esc(r.price)}" placeholder="${svc(r.service).price}" ${dis}></td>
     <td class="num"><b id="a-${r.id}">${money(c.amt)}</b></td><td>${locked ? '' : `<button class="ico" data-act="delRow" data-id="${r.id}">×</button>`}</td></tr>`;
   };
-  const lineHTML = l => `<tr data-line="${l.id}" class="${isSection(l) ? 'sec' : ''}"><td><input data-l="${l.id}" data-f="desc" value="${esc(l.desc)}" ${dis}></td><td><input data-l="${l.id}" data-f="note" value="${esc(l.note)}" ${dis}></td><td><input class="n s" inputmode="decimal" data-l="${l.id}" data-f="qty" value="${esc(l.qty)}" ${dis}></td><td><input class="s" data-l="${l.id}" data-f="unit" value="${esc(l.unit)}" ${dis}></td><td><input class="n" inputmode="decimal" data-l="${l.id}" data-f="price" value="${esc(l.price)}" ${dis}></td><td class="num"><b id="la-${l.id}">${isSection(l) ? '' : money2(lineAmt(l))}</b></td><td>${locked ? '' : `<button class="ico" tabindex="-1" data-act="delLine" data-id="${l.id}">×</button>`}</td></tr>`;
+  const lineHTML = l => `<tr data-line="${l.id}" class="${isSection(l) ? 'sec' : ''}"><td><input data-l="${l.id}" data-f="desc" list="pb" value="${esc(l.desc)}" ${dis}></td><td><input data-l="${l.id}" data-f="note" value="${esc(l.note)}" ${dis}></td><td><input class="n s" inputmode="decimal" data-l="${l.id}" data-f="qty" value="${esc(l.qty)}" ${dis}></td><td><input class="s" data-l="${l.id}" data-f="unit" value="${esc(l.unit)}" ${dis}></td><td><input class="n" inputmode="decimal" data-l="${l.id}" data-f="price" value="${esc(l.price)}" ${dis}></td><td class="num"><b id="la-${l.id}">${isSection(l) ? '' : money2(lineAmt(l))}</b></td><td>${locked ? '' : `<button class="ico" tabindex="-1" data-act="delLine" data-id="${l.id}">×</button>`}</td></tr>`;
   const job = DB.jobs.find(j => j.estimateId === e.id);
   return {
     title: `Estimate #${e.number}`, html: `
     <div class="page-head"><div><a href="#/estimates" class="link">← Estimates</a><h1>#${e.number} · ${esc(e.title)} ${badge(e.status)}</h1></div>
-    <div class="btns noprint"><button class="btn" data-act="preview" data-id="${e.id}">Preview proposal</button>
+    <div class="btns noprint"><button class="btn" data-act="preview" data-id="${e.id}">Preview proposal</button><a class="btn" href="#/design/${e.id}">🎨 Design</a>
     ${e.status === 'draft' ? `<button class="btn" data-act="markSent" data-id="${e.id}">Mark sent</button>` : ''}
     ${isOpenEst(e) ? `<button class="btn primary" data-act="signEst" data-id="${e.id}">Capture signature</button><button class="btn ghost" data-act="declineEst" data-id="${e.id}">Declined</button>` : ''}
     ${e.status === 'signed' && !job ? `<button class="btn primary" data-act="toJob" data-id="${e.id}">Create job</button>` : ''}${job ? `<a class="btn" href="#/jobs/${job.id}">Open job →</a>` : ''}
@@ -174,9 +174,9 @@ function estimateEditor(e) {
       <label><span>Project title</span><input data-e="title" value="${esc(e.title)}" ${dis}></label>
       <label><span>Location</span><input data-e="address" value="${esc(e.address)}" ${dis}></label>
       <label><span>Proposal date</span><input type="date" data-e="createdAt" value="${esc(e.createdAt)}" ${dis}></label></div></div>
-    <div class="card"><h3>Proposed items ${locked ? '' : `<span class="btns"><button class="btn sm" data-act="xlsImport" data-id="${e.id}">⬆ Import Excel</button><button class="btn sm" data-act="mapMeasure" data-id="${e.id}">🛰 Measure on map</button><button class="btn sm" data-act="addLine" data-id="${e.id}" data-n="10">+ 10 rows</button><button class="btn sm primary" data-act="addLine" data-id="${e.id}">+ Row</button></span>`}</h3>
+    <div class="card"><h3>Proposed items ${locked ? '' : `<span class="btns"><button class="btn sm" data-act="xlsImport" data-id="${e.id}">⬆ Import Excel</button><button class="btn sm primary" data-act="takeoff" data-id="${e.id}">🛰 Satellite take-off${e.takeoff && e.takeoff.shapes.length ? ` (${e.takeoff.shapes.length})` : ''}</button><button class="btn sm" data-act="addLine" data-id="${e.id}" data-n="10">+ 10 rows</button><button class="btn sm" data-act="addLine" data-id="${e.id}">+ Row</button></span>`}</h3>
       <div class="scroll"><table class="edit grid"><tr><th>Proposed item</th><th>Description</th><th>Qty</th><th>Units</th><th>Unit price</th><th class="num">Total</th><th></th></tr>${e.lines.map(lineHTML).join('')}</table></div>
-      <p class="hint">Works like a spreadsheet: Enter / ↑ ↓ move between rows, and you can paste a block of cells copied from Excel. A row with only a name (no qty, unit or price) becomes a section heading.</p></div>
+      <p class="hint">Works like a spreadsheet: Enter / ↑ ↓ move between rows, and you can paste a block of cells copied from Excel. Start typing an item to pick it from your price book. A row with only a name (no qty, unit or price) becomes a section heading.</p></div>
     ${e.rows.length ? `<div class="card"><h3>Paving take-off</h3><div class="scroll"><table class="edit"><tr><th>Service</th><th>Area / note</th><th>L (ft)</th><th>W (ft)</th><th>Area (sf)</th><th>Depth (in)</th><th>Qty</th><th>$ / unit</th><th>Amount</th><th></th></tr>${e.rows.map(rowHTML).join('')}</table></div></div>` : ''}
     <div class="cols"><div class="card"><h3>Terms</h3><textarea class="terms" data-e="terms" rows="8" ${dis}>${esc(e.terms || DB.settings.terms)}</textarea></div>
     <div class="card totals">
@@ -205,7 +205,8 @@ CHG.estimate = el => {
     const r = e.rows.find(x => x.id === el.dataset.r), f = el.dataset.f; r[f] = (f === 'service' || f === 'label') ? el.value : (el.value === '' ? (f === 'price' ? null : '') : +el.value);
     if (f === 'length' || f === 'width') { if (r.length && r.width) { r.area = Math.round(r.length * r.width); const ai = $(`[data-r="${r.id}"][data-f="area"]`); if (ai) ai.value = r.area; } }
     if (f === 'service') { const s = svc(r.service); if (s.unit === 'ton' && !r.depth) r.depth = 2; save(); render(); return; }
-  } else if (el.dataset.l) { const l = e.lines.find(x => x.id === el.dataset.l), f = el.dataset.f; l[f] = (f === 'qty' || f === 'price') ? numIn(el.value) : el.value; }
+  } else if (el.dataset.l) { const l = e.lines.find(x => x.id === el.dataset.l), f = el.dataset.f; l[f] = (f === 'qty' || f === 'price') ? numIn(el.value) : el.value;
+    if (f === 'desc') { const it = pbFind(el.value); if (it) { [['unit', it.unit], ['price', it.price]].forEach(([k, v]) => { if (blank(l[k]) || !String(l[k]).trim()) { l[k] = v; const inp = $(`[data-l="${l.id}"][data-f="${k}"]`); if (inp) inp.value = v; } }); } } }
   save(); refreshEstimate(e);
 };
 ACT.delRow = el => { const e = curEst(); e.rows = e.rows.filter(r => r.id !== el.dataset.id); save(); render(); };
@@ -266,28 +267,13 @@ ACT.xlsImport = el => {
       await loadXLSX(); const wb = XLSX.read(await inp.files[0].arrayBuffer(), { type: 'array', cellDates: true });
       const p = parseProposalSheet(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' }));
       if (!p.lines.length) return toast('No line items found in that file', 'err');
-      const apply = () => { e.lines = p.lines; if (p.date) e.createdAt = p.date; if (p.location) e.address = p.location; if (p.title && (e.title === 'New project' || !e.title)) e.title = p.title; save(); render(); toast(`Imported ${p.lines.filter(l => !isSection(l)).length} items from Excel`); };
+      const apply = () => { e.lines = p.lines; pbLearn(p.lines); if (p.date) e.createdAt = p.date; if (p.location) e.address = p.location; if (p.title && (e.title === 'New project' || !e.title)) e.title = p.title; save(); render(); toast(`Imported ${p.lines.filter(l => !isSection(l)).length} items from Excel`); };
       if (e.lines.some(l => l.desc || l.qty !== '')) confirmBox(`Replace the current items with ${p.lines.length} rows from “${inp.files[0].name}”?`, apply); else apply();
     } catch (x) { toast(x.message || 'Could not read that file', 'err'); }
   };
   inp.click();
 };
 
-function proposalHTML(e) {
-  const c = byId('customers', e.customerId) || {}, t = estTotals(e), s = DB.settings, hide = e.hidePrices !== false, n = hide ? 4 : 6;
-  const px = (a, b) => hide ? '' : `<td class="num">${a}</td><td class="num">${b}</td>`;
-  const legacy = e.rows.map(r => ({ r, c: rowCalc(r) })).filter(x => x.c.amt || x.r.label);
-  const lines = e.lines.filter(l => String(l.desc || '').trim() || String(l.note || '').trim());
-  return `<div class="proposal"><header><div><h2>${esc(s.company)}</h2><small>${esc(s.address)}<br>${esc(s.phone)} · ${esc(s.email)}</small></div><div class="right"><h2>PROPOSAL #${e.number}</h2><small>DATE: ${fmtD(e.createdAt)}</small></div></header>
-  <div class="cols"><div><small>PREPARED FOR</small><p><b>${esc(c.name)}</b>${c.contact ? '<br>' + esc(c.contact) : ''}${c.email || c.phone ? '<br>' + esc([c.email, c.phone].filter(Boolean).join(' · ')) : ''}</p></div><div><small>PROJECT TITLE</small><p><b>${esc(e.title)}</b><br><small>LOCATION</small> ${esc(e.address)}</p></div></div>
-  <table><tr><th>Proposed item</th><th>Description</th><th class="num">Qty</th><th>Units</th>${hide ? '' : '<th class="num">Unit price</th><th class="num">Total</th>'}</tr>
-  ${legacy.map(({ r, c }) => `<tr><td>${esc(svc(r.service).name)}</td><td>${esc(r.label)}${c.unit === 'ton' ? ` <small>${num(c.area, 0)} sf @ ${r.depth}"</small>` : ''}</td><td class="num">${num(c.qty, c.unit === 'ton' ? 1 : 0)}</td><td>${UNIT_LABEL[c.unit]}</td>${px(money2(c.price), money2(c.amt))}</tr>`).join('')}
-  ${lines.map(l => isSection(l) ? `<tr class="sec"><td colspan="${n}">${esc(l.desc)}</td></tr>` : `<tr><td>${esc(l.desc)}</td><td>${esc(l.note)}</td><td class="num">${l.qty === '' || l.qty == null ? '' : num(l.qty, 2)}</td><td>${esc(l.unit)}</td>${px(l.price === '' || l.price == null ? '' : money2(l.price), money2(lineAmt(l)))}</tr>`).join('')}
-  ${t.tax ? `<tr><td colspan="${n - 1}" class="num">Tax (${e.taxRate}%)</td><td class="num">${money2(t.tax)}</td></tr>` : ''}
-  <tr class="grand"><td colspan="${n - 1}" class="num"><b>Total of proposed items listed above:</b></td><td class="num"><b>${money2(t.total)}</b></td></tr></table>
-  <h4>Contract notes &amp; terms</h4><p class="terms-text">${esc(e.terms || s.terms)}</p>
-  <div class="sigblock"><div>${e.signature ? `${e.signature.img ? `<img src="${e.signature.img}" alt="signature">` : `<div class="typed">${esc(e.signature.name)}</div>`}` : '<div class="sigline"></div>'}<small>Accepted by ${e.signature ? esc(e.signature.name) + ' on ' + fmtD(e.signature.date) : '________________________'}</small></div><div><div class="sigline"></div><small>${esc(s.company)} authorized signature</small></div></div></div>`;
-}
 ACT.preview = el => { const e = byId('estimates', el.dataset.id); modal(`<div class="noprint btns"><button class="btn primary" onclick="window.print()">Print / Save PDF</button></div>${proposalHTML(e)}`, { wide: true, print: true }); };
 
 function signEstimate(id, after) {
@@ -312,33 +298,6 @@ function signEstimate(id, after) {
 /* ---------- satellite measure (Leaflet) ---------- */
 const toSqFt = pts => { if (pts.length < 3) return 0; const lat0 = pts.reduce((a, p) => a + p[0], 0) / pts.length * Math.PI / 180, kx = 111320 * Math.cos(lat0), ky = 110540; const xy = pts.map(p => [p[1] * kx, p[0] * ky]); let s = 0; xy.forEach((p, i) => { const q = xy[(i + 1) % xy.length]; s += p[0] * q[1] - q[0] * p[1]; }); return Math.abs(s) / 2 * 10.7639; };
 const toFeet = pts => { let m = 0; for (let i = 1; i < pts.length; i++) { const [a, b] = [pts[i - 1], pts[i]], R = 6371000, r = Math.PI / 180, dl = (b[0] - a[0]) * r, dn = (b[1] - a[1]) * r, h = Math.sin(dl / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dn / 2) ** 2; m += 2 * R * Math.asin(Math.sqrt(h)); } return m * 3.28084; };
-ACT.mapMeasure = el => {
-  const e = byId('estimates', el.dataset.id);
-  modal(`<h3>Measure site</h3><div class="mapbar"><input id="mapQ" placeholder="Search address…" value="${esc(e.address)}"><button class="btn sm" id="mapGo">Find</button>
-  <div class="tabs"><button class="on" id="mArea">Area</button><button id="mLen">Length</button></div><button class="btn sm" id="mUndo">Undo</button><button class="btn sm" id="mClr">Clear</button></div>
-  <div id="map"></div><div class="mapbar"><b id="mRes">Click the map to place points</b><span class="grow"></span><button class="btn primary sm" id="mAdd">Add to items</button></div>`, { wide: true });
-  if (typeof L === 'undefined') { $('#map').innerHTML = '<div class="empty"><b>Map library unavailable</b><span>Connect to the internet to use satellite measuring, or type L × W directly.</span></div>'; return; }
-  const map = window._map = L.map('map').setView([39.5, -98.35], 4);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, attribution: 'Imagery © Esri' }).addTo(map);
-  let pts = [], mode = 'area', layer = L.layerGroup().addTo(map);
-  const draw = () => {
-    layer.clearLayers(); pts.forEach(p => L.circleMarker(p, { radius: 5, color: '#f59e0b', fillOpacity: 1 }).addTo(layer));
-    if (pts.length > 1) (mode === 'area' && pts.length > 2 ? L.polygon(pts, { color: '#f59e0b', weight: 2 }) : L.polyline(pts, { color: '#f59e0b', weight: 3 })).addTo(layer);
-    $('#mRes').textContent = pts.length ? (mode === 'area' ? `${num(toSqFt(pts), 0)} sq ft  (${num(toSqFt(pts) / 9, 0)} sq yd)` : `${num(toFeet(pts), 0)} linear ft`) : 'Click the map to place points';
-  };
-  map.on('click', ev => { pts.push([ev.latlng.lat, ev.latlng.lng]); draw(); });
-  $('#mUndo').onclick = () => { pts.pop(); draw(); }; $('#mClr').onclick = () => { pts = []; draw(); };
-  const setMode = m => { mode = m; $('#mArea').classList.toggle('on', m === 'area'); $('#mLen').classList.toggle('on', m === 'length'); draw(); };
-  $('#mArea').onclick = () => setMode('area'); $('#mLen').onclick = () => setMode('length');
-  const go = async () => { try { const r = await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent($('#mapQ').value))).json(); if (r[0]) map.setView([+r[0].lat, +r[0].lon], 19); else toast('Address not found', 'err'); } catch (x) { toast('Search failed — pan the map manually', 'err'); } };
-  $('#mapGo').onclick = go; if (e.address) go();
-  $('#mAdd').onclick = () => {
-    if (pts.length < 2) return toast('Place points first', 'err');
-    const area = mode === 'area' && pts.length > 2;
-    e.lines.push({ id: uid('l'), desc: 'Measured on map', note: '', qty: Math.round(area ? toSqFt(pts) : toFeet(pts)), unit: area ? 'SQ FT' : 'FT', price: '' }); save(); closeModal(); render(); toast('Added to proposed items');
-  };
-};
-
 const portalURL = c => location.origin + location.pathname + '#/p/' + c.portalToken;
 ACT.copyPortal = el => {
   const c = byId('customers', el.dataset.id); if (!c.portalToken) { c.portalToken = newToken(); save(); }
