@@ -2,7 +2,7 @@
 const NAV = [
   ['WIN WORK', [['crm', 'CRM', '👥'], ['estimates', 'Estimates & Proposals', '📐'], ['design', 'Proposal Design', '🎨']]],
   ['MANAGE JOBS', [['schedule', 'Scheduling & Dispatch', '🗓'], ['jobs', 'Job Sites', '🚧'], ['costing', 'Job Costing', '💲'], ['portal', 'Customer Portal', '🔗']]],
-  ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['quickbooks', 'QuickBooks', '📒'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
+  ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['email', 'Email & Follow-ups', '✉️'], ['quickbooks', 'QuickBooks', '📒'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
 ];
 function route() { const [, name = 'dashboard', ...args] = location.hash.split('/'); return { name, args }; }
 VIEWS.p = () => VIEWS.portal([DB.customers[0].id]);
@@ -38,6 +38,8 @@ document.addEventListener('change', e => {
   else if (el.dataset.svc) CHG.svc(el);
   else if (el.dataset.pb) CHG.pb(el);
   else if (el.dataset.priv) CHG.priv(el);
+  else if (el.dataset.em) CHG.em(el);
+  else if (el.dataset.fu) CHG.fu(el);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 window.addEventListener('hashchange', () => { if (CLOUD && isPortalHash() !== !!PORTAL) return location.reload(); closeModal(); if (DB) render(); window.scrollTo(0, 0); });

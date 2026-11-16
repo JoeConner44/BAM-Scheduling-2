@@ -22,6 +22,15 @@ Data is saved in your browser (localStorage). Use **Settings → Export JSON** t
 | **Invoicing & Payments** | Invoice from job balance, send, record card/ACH/check payments, overdue tracking |
 | **Automation** | Rules + inbox: signed proposal → create job & alert owner, job complete → draft invoice, budget threshold & overdue alerts, new-lead alerts |
 
+## Email & follow-ups
+Proposals and invoices can be emailed from the app (PDF attached, with a button to the customer's portal), and follow-ups on unsigned proposals and overdue invoices go out automatically on a schedule you set under **Email & Follow-ups**. One-time setup:
+
+1. **Resend account:** sign up at resend.com, add and verify your sending domain (three DNS records), and create an API key.
+2. **Sender:** in Supabase → Edge Functions create a function named `email`, paste in [`supabase/functions/email/index.ts`](supabase/functions/email/index.ts), and turn **Verify JWT off** (the function checks for a staff login or the scheduler's secret itself). Set secrets `RESEND_API_KEY`, `EMAIL_FROM` (e.g. `Your Company <proposals@yourdomain.com>`), optional `EMAIL_REPLY_TO`, and `APP_URL`.
+3. **Schedule:** run [`supabase/email.sql`](supabase/email.sql) in the SQL Editor (edit the project URL in it if yours differs). It sends due follow-ups on weekday mornings.
+
+Only records emailed from the app with "automatic follow-ups" ticked are ever followed up, and nothing is sent until follow-ups are switched on.
+
 ## QuickBooks Online
 The **QuickBooks** page (left menu) lets a bookkeeper connect a QuickBooks Online company, bring customers and invoices in, pull payments so invoices here show as paid, and send invoices out. It needs the shared backend plus a one-time setup:
 

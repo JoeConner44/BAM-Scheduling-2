@@ -165,8 +165,8 @@ function estimateEditor(e) {
     title: `Estimate #${e.number}`, html: `
     <div class="page-head"><div><a href="#/estimates" class="link">← Estimates</a><h1>#${e.number} · ${esc(e.title)} ${badge(e.status)}</h1></div>
     <div class="btns noprint"><button class="btn" data-act="preview" data-id="${e.id}">Preview proposal</button><a class="btn" href="#/design/${e.id}">🎨 Design</a>
-    ${e.status === 'draft' ? `<button class="btn" data-act="markSent" data-id="${e.id}">Mark sent</button>` : ''}
-    ${isOpenEst(e) ? `<button class="btn primary" data-act="signEst" data-id="${e.id}">Capture signature</button><button class="btn ghost" data-act="declineEst" data-id="${e.id}">Declined</button>` : ''}
+    ${isOpenEst(e) ? `<button class="btn primary" data-act="emailProposal" data-id="${e.id}">✉ Email proposal</button>` : ''}${e.status === 'draft' ? `<button class="btn" data-act="markSent" data-id="${e.id}">Mark sent</button>` : ''}
+    ${isOpenEst(e) ? `<button class="btn" data-act="signEst" data-id="${e.id}">Capture signature</button><button class="btn ghost" data-act="declineEst" data-id="${e.id}">Declined</button>` : ''}
     ${e.status === 'signed' && !job ? `<button class="btn primary" data-act="toJob" data-id="${e.id}">Create job</button>` : ''}${job ? `<a class="btn" href="#/jobs/${job.id}">Open job →</a>` : ''}
     ${e.status === 'signed' || e.status === 'declined' ? `<button class="btn ghost" data-act="reopenEst" data-id="${e.id}">Reopen</button>` : ''}${e.driveUrl ? `<a class="btn" target="_blank" rel="noopener" href="${esc(e.driveUrl)}">Drive folder ↗</a>` : ''}</div></div>
     <div class="card"><div class="grid4">
@@ -178,6 +178,7 @@ function estimateEditor(e) {
       <div class="scroll"><table class="edit grid"><tr><th>Proposed item</th><th>Description</th><th>Qty</th><th>Units</th><th>Unit price</th><th class="num">Total</th><th></th></tr>${e.lines.map(lineHTML).join('')}</table></div>
       <p class="hint">Works like a spreadsheet: Enter / ↑ ↓ move between rows, and you can paste a block of cells copied from Excel. Start typing an item to pick it from your price book. A row with only a name (no qty, unit or price) becomes a section heading.</p></div>
     ${e.rows.length ? `<div class="card"><h3>Paving take-off</h3><div class="scroll"><table class="edit"><tr><th>Service</th><th>Area / note</th><th>L (ft)</th><th>W (ft)</th><th>Area (sf)</th><th>Depth (in)</th><th>Qty</th><th>$ / unit</th><th>Amount</th><th></th></tr>${e.rows.map(rowHTML).join('')}</table></div></div>` : ''}
+    ${emailHistoryHTML(e, 'estimates')}
     <div class="cols"><div class="card"><h3>Terms</h3><textarea class="terms" data-e="terms" rows="8" ${dis}>${esc(e.terms || DB.settings.terms)}</textarea></div>
     <div class="card totals">
       <label class="check"><span class="switch"><input type="checkbox" data-e="hidePrices" ${e.hidePrices !== false ? 'checked' : ''} ${dis}><i></i></span> <span><b>Lump-sum proposal</b><br><small>Customer sees items, quantities and the total only — unit prices and line totals are hidden.</small></span></label>

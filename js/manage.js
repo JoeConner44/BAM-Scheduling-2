@@ -155,14 +155,18 @@ ACT.newInvoice = () => {
     }
   });
 };
-ACT.openInvoice = el => {
-  const i = byId('invoices', el.dataset.id), s = invStatus(i), c = byId('customers', i.customerId) || {}, co = DB.settings;
-  modal(`<div class="noprint btns">${PORTAL ? '' : i.status === 'draft' ? `<button class="btn" data-act="sendInvoice" data-id="${i.id}">Send to customer</button>` : ''}${!PORTAL && s !== 'paid' && s !== 'draft' ? `<button class="btn primary" data-act="payInvoice" data-id="${i.id}">Record payment</button>` : ''}<button class="btn" onclick="window.print()">Print / PDF</button>${PORTAL ? '' : `<button class="btn" data-act="copyPortal" data-id="${i.customerId}">🔗 Portal link</button><button class="btn danger ghost" data-act="delInvoice" data-id="${i.id}">Delete</button>`}</div>
-  <div class="proposal"><header><div><h2>${esc(co.company)}</h2><small>${esc(co.address)} · ${esc(co.phone)}</small></div><div class="right"><h2>INVOICE #${i.number}</h2>${badge(s)}</div></header>
+function invoiceDocHTML(i) {
+  const s = invStatus(i), c = byId('customers', i.customerId) || {}, co = DB.settings, t = PT();
+  return `<div class="proposal pf-${t.font} pz-${t.size}" style="--pa:${esc(t.accent)}"><header><div class="pco">${t.logo ? `<img class="plogo" src="${t.logo}" style="height:${+t.logoH || 70}px" alt="">` : ''}<div><h2>${esc(co.company)}</h2><small>${esc(co.address)} · ${esc(co.phone)}</small></div></div><div class="right"><h2>INVOICE #${i.number}</h2>${badge(s)}</div></header>
   <div class="cols"><div><small>BILL TO</small><p><b>${esc(c.name)}</b><br>${esc(c.contact)}<br>${esc(c.address)}</p></div><div><small>ISSUED</small> ${fmtD(i.issued)}<br><small>DUE</small> <b>${fmtD(i.due)}</b></div></div>
   <table><tr><th>Description</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr>${i.items.map(l => `<tr><td>${esc(l.desc)}</td><td class="num">${l.qty}</td><td class="num">${money2(l.price)}</td><td class="num">${money2(l.qty * l.price)}</td></tr>`).join('')}
   ${i.payments.map(p => `<tr><td colspan="3" class="num"><small>Payment ${fmtD(p.date)} (${esc(p.method)})</small></td><td class="num">−${money2(p.amount)}</td></tr>`).join('')}
-  <tr class="grand"><td colspan="3" class="num"><b>BALANCE DUE</b></td><td class="num"><b>${money2(invBalance(i))}</b></td></tr></table></div>`, { wide: true, print: true });
+  <tr class="grand"><td colspan="3" class="num"><b>BALANCE DUE</b></td><td class="num"><b>${money2(invBalance(i))}</b></td></tr></table></div>`;
+}
+ACT.openInvoice = el => {
+  const i = byId('invoices', el.dataset.id), s = invStatus(i), c = byId('customers', i.customerId) || {}, co = DB.settings;
+  modal(`<div class="noprint btns">${PORTAL ? '' : i.status === 'draft' ? `<button class="btn" data-act="sendInvoice" data-id="${i.id}">Send to customer</button>` : ''}${!PORTAL && s !== 'paid' && s !== 'draft' ? `<button class="btn primary" data-act="payInvoice" data-id="${i.id}">Record payment</button>` : ''}${PORTAL ? '' : `<button class="btn primary" data-act="emailInvoice" data-id="${i.id}">✉ Email invoice</button>`}<button class="btn" onclick="window.print()">Print / PDF</button>${PORTAL ? '' : `<button class="btn" data-act="copyPortal" data-id="${i.customerId}">🔗 Portal link</button><button class="btn danger ghost" data-act="delInvoice" data-id="${i.id}">Delete</button>`}</div>
+  ${invoiceDocHTML(i)}`, { wide: true, print: true });
 };
 ACT.sendInvoice = el => { const i = byId('invoices', el.dataset.id); i.status = 'sent'; save(); render(); closeModal(); toast('Invoice marked sent — customer can pay in their portal'); };
 ACT.delInvoice = el => confirmBox('Delete this invoice?', () => { DB.invoices = DB.invoices.filter(i => i.id !== el.dataset.id); save(); render(); });
