@@ -148,3 +148,12 @@ body.tk-open{overflow:hidden}#tk{position:fixed;inset:0;z-index:60;display:flex;
 .bidsel{border:1px solid var(--line);border-radius:8px;padding:4px 10px;margin-bottom:10px}.bidsel label.check{margin:6px 0;flex-wrap:wrap}.bidsel input[data-bemail]{flex:1;min-width:180px;max-width:300px}
 th.sortable{cursor:pointer}th.sortable.on{color:var(--ink)}th.sortable.on:after{content:" ▾"}
 table.pa td{padding:3px 6px}table.pa input.n{min-width:96px}.proposal .pasum td:first-child{width:28px;color:#555}.proposal .pacont{font-size:.86em}.proposal .pacont th,.proposal .pacont td{padding:4px 5px}
+/* ---- crew view ---- */
+.crew{max-width:640px;margin:0 auto}.crew header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.crew header b{display:block;font-size:17px}.crew header span{color:var(--mut)}
+.crew h3{margin:18px 0 8px;display:flex;justify-content:space-between;align-items:baseline}.crew h3 small{font-weight:400}
+.cclock{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:14px}.cclock.on{border-color:var(--green);background:rgba(22,163,74,.1)}.cclock small{display:block;color:var(--mut)}.cclock b{display:block;font-size:16px}.cclock span{font-size:22px;font-weight:800}
+.cjob{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}.cjob.on{border-color:var(--green)}.chead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;cursor:pointer}.chead b{display:block;font-size:16px}.chead small{color:var(--mut)}
+.live{font-style:normal;font-size:11px;font-weight:800;color:#fff;background:var(--green);padding:2px 8px;border-radius:99px;margin-right:8px}
+.cbody{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px}.cbody h4{margin:6px 0 0}.cnote{background:rgba(245,158,11,.12);border-radius:8px;padding:10px;margin:0}.btn.big{padding:16px;font-size:17px;justify-content:center}
+.clog textarea{margin-bottom:6px}.clog .btns input{flex:1}.clogs p{margin:6px 0;padding:8px;background:var(--bg);border-radius:8px}.crew details{margin-top:14px}.crew summary{cursor:pointer;color:var(--mut);margin-bottom:8px}.crew label.btn{justify-content:center}
+table th.today{background:rgba(245,158,11,.12)}

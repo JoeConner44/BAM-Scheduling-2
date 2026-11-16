@@ -4,7 +4,9 @@ const CFG = window.ASPHALT_CONFIG || {};
 let CLOUD = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase);
 let PORTAL = null;            // portal token when a customer is viewing their link
 let SB = null, snap = {}, pushTimer = null, pushing = false, again = false, pollTimer = null, lastSeen = '', pollN = 0;
-const COLLS = ['customers', 'estimates', 'jobs', 'invoices', 'crews', 'rules', 'notifications'];
+const COLLS = ['customers', 'estimates', 'jobs', 'invoices', 'crews', 'rules', 'notifications', 'time'];
+// an estimator's login cannot read or write invoices or the private settings, so never try to sync those for them
+const roleCanSync = k => !(typeof ME !== 'undefined' && ME.role === 'estimator' && (k.startsWith('invoices|') || k === 'meta|private'));
 const isPortalHash = () => /^#\/p\//.test(location.hash);
 const portalTokenFromHash = () => decodeURIComponent(location.hash.slice(4).split(/[/?]/)[0]);
 if (CLOUD) SB = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true } });
@@ -38,8 +40,8 @@ async function cloudPush() {
   pushing = true;
   try {
     const cur = flatten(DB), up = [], del = {};
-    Object.keys(cur).forEach(k => { if (cur[k] !== snap[k]) { const [coll, ...r] = k.split('|'); up.push({ coll, id: r.join('|'), data: JSON.parse(cur[k]) }); } });
-    Object.keys(snap).forEach(k => { if (!(k in cur)) { const [coll, ...r] = k.split('|'); (del[coll] = del[coll] || []).push(r.join('|')); } });
+    Object.keys(cur).forEach(k => { if (cur[k] !== snap[k] && roleCanSync(k)) { const [coll, ...r] = k.split('|'); up.push({ coll, id: r.join('|'), data: JSON.parse(cur[k]) }); } });
+    Object.keys(snap).forEach(k => { if (!(k in cur) && roleCanSync(k)) { const [coll, ...r] = k.split('|'); (del[coll] = del[coll] || []).push(r.join('|')); } });
     for (let i = 0; i < up.length; i += 100) { const { error } = await SB.from('records').upsert(up.slice(i, i + 100), { onConflict: 'coll,id' }); if (error) throw error; }
     for (const c of Object.keys(del)) { const { error } = await SB.from('records').delete().eq('coll', c).in('id', del[c]); if (error) throw error; }
     snap = cur; setSync('ok');

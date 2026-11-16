@@ -1,20 +1,21 @@
 /* Router + global event wiring */
 const NAV = [
   ['WIN WORK', [['crm', 'CRM', '👥'], ['estimates', 'Estimates & Proposals', '📐'], ['bids', 'Bids', '🎯'], ['design', 'Proposal Design', '🎨']]],
-  ['MANAGE JOBS', [['schedule', 'Scheduling & Dispatch', '🗓'], ['jobs', 'Job Sites', '🚧'], ['costing', 'Job Costing', '💲'], ['portal', 'Customer Portal', '🔗']]],
-  ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['email', 'Email & Follow-ups', '✉️'], ['quickbooks', 'QuickBooks', '📒'], ['automation', 'Automation & Inbox', '⚡'], ['settings', 'Settings', '⚙️']]],
+  ['MANAGE JOBS', [['schedule', 'Scheduling & Dispatch', '🗓'], ['jobs', 'Job Sites', '🚧'], ['crew', 'Crew View', '👷'], ['time', 'Timesheets', '⏱'], ['costing', 'Job Costing', '💲'], ['portal', 'Customer Portal', '🔗']]],
+  ['RUN BUSINESS', [['dashboard', 'Analytics', '📊'], ['invoices', 'Invoicing & Payments', '🧾'], ['email', 'Email & Follow-ups', '✉️'], ['quickbooks', 'QuickBooks', '📒'], ['automation', 'Automation & Inbox', '⚡'], ['team', 'Team & Roles', '🧑‍🤝‍🧑'], ['settings', 'Settings', '⚙️']]],
 ];
-function route() { const [, name = 'dashboard', ...args] = location.hash.split('/'); return { name, args }; }
+function route() { const [, name = homePage(), ...args] = location.hash.split('/'); return { name, args }; }
 VIEWS.p = () => VIEWS.portal([DB.customers[0].id]);
 
 function render() {
   let { name, args } = route();
   if (PORTAL && name !== 'p') { location.hash = '#/p/' + PORTAL; return; }
-  const v = VIEWS[name] || VIEWS.dashboard;
+  if (!PORTAL && (!VIEWS[name] || !canSee(name))) { location.hash = '#/' + homePage(); return; }      // pages this role may not open
+  const v = VIEWS[name];
   const out = v(args);
   document.body.classList.toggle('portal-mode', !!out.portal);
   const unread = DB.notifications.filter(n => !n.read).length;
-  const nav = NAV.map(([g, items]) => `<div class="grp">${g}</div>` + items.map(([k, l, i]) => `<a href="#/${k}" class="${k === name ? 'on' : ''}"><span>${i}</span>${l}${k === 'automation' && unread ? `<b class="pill">${unread}</b>` : ''}</a>`).join('')).join('');
+  const nav = NAV.map(([g, items]) => [g, items.filter(([k]) => canSee(k))]).filter(([, items]) => items.length).map(([g, items]) => `<div class="grp">${g}</div>` + items.map(([k, l, i]) => `<a href="#/${k}" class="${k === name ? 'on' : ''}"><span>${i}</span>${l}${k === 'automation' && unread ? `<b class="pill">${unread}</b>` : ''}</a>`).join('')).join('');
   $('#nav').innerHTML = nav;
   $('#title').textContent = out.title;
   $('#bell').innerHTML = `🔔${unread ? `<b class="pill">${unread}</b>` : ''}`;
@@ -42,6 +43,8 @@ document.addEventListener('change', e => {
   else if (el.dataset.em) CHG.em(el);
   else if (el.dataset.cemail) CHG.cemail(el);
   else if (el.dataset.ret) CHG.ret(el);
+  else if (el.dataset.rate) CHG.rate(el);
+  else if (el.dataset.team) CHG.team(el);
   else if (el.dataset.fu) CHG.fu(el);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
@@ -50,6 +53,11 @@ $('#menu').onclick = () => document.body.classList.toggle('navopen');
 $('#nav').onclick = () => document.body.classList.remove('navopen');
 $('#bell').onclick = () => location.hash = '#/automation';
 
+function bootCrew() {      // crew logins: nothing from the office is loaded; the crew view talks to the crew_* database functions
+  CREWMODE = true; DB = { v: 1, settings: { company: '' }, notifications: [], customers: [], estimates: [], jobs: [], invoices: [], crews: [], rules: [], time: [], seq: {} };
+  if (route().name !== 'crew') location.hash = '#/crew'; render();
+  setInterval(() => { if (!document.hidden && !CR.busy && !$('#modal.open') && !/TEXTAREA|INPUT/.test((document.activeElement || {}).tagName || '')) crewLoad(); }, 60000);
+}
 async function boot() {
   if (isPortalHash()) {
     if (!CLOUD) return showGate('<h1>Portal unavailable</h1><p class="muted">The shared backend is not configured, so portal links cannot be opened.</p>');
@@ -60,9 +68,12 @@ async function boot() {
     if (!(await cloudSession())) return showLogin();
     const staff = (await SB.rpc('am_i_staff')).data;
     if (!staff) return showGate('<h1>No access</h1><p class="muted">Your account is not on the staff list. Ask the owner to add your email.</p><button class="btn" data-act="signOut">Sign out</button>');
+    const sess = await cloudSession(), role = (await SB.rpc('my_role')).data || 'owner';     // no roles set up yet = everyone is an owner, as before
+    ME = { email: sess.user.email, name: '', role, crewId: null };
+    if (role === 'crew') return bootCrew();
     if (!(await cloudPull())) return firstRun();
     await processPortalEvents(); runChecks(); render(); setSync('ok');
-    $('.side-foot').innerHTML = '<span id="sync">● Synced</span><br><button class="btn sm" data-act="signOut">Sign out</button>';
+    $('.side-foot').innerHTML = `<span id="sync">● Synced</span><br><small>${esc(ME.email)} · ${ROLE_LABEL[ME.role] || ME.role}</small><br><button class="btn sm" data-act="signOut">Sign out</button>`;
     pollTimer = setInterval(cloudPoll, 20000); document.addEventListener('visibilitychange', () => { if (!document.hidden) cloudPoll(); });
   } catch (e) { showGate(`<h1>Can’t reach the database</h1><p class="muted">${esc(e.message || e)}</p><button class="btn" onclick="location.reload()">Retry</button>`); }
 }

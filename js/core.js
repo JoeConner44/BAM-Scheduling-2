@@ -44,9 +44,11 @@ const ROLES = ['Owner', 'Estimator', 'Office', 'Foreman'];
 function loadDB() {
   try { DB = JSON.parse(localStorage.getItem(KEY)); } catch (e) { DB = null; }
   if (!DB || DB.v !== 1) { DB = seed(); save(); }
+  DB.time = DB.time || [];
 }
 function save() {
-  if (typeof PORTAL !== 'undefined' && PORTAL) return;           // customers never write directly
+  if (typeof PORTAL !== 'undefined' && PORTAL) return;
+  if (typeof CREWMODE !== 'undefined' && CREWMODE) return;       // crew logins only write through the crew_* database functions           // customers never write directly
   if (typeof CLOUD !== 'undefined' && CLOUD) return cloudQueue(); // shared backend
   try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) { toast('Storage full — export your data from Settings', 'err'); }
 }

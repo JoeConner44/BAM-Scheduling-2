@@ -37,8 +37,8 @@ async function isStaff(req: Request): Promise<boolean> {
   if (!u.ok) return false;
   const email = String((await u.json()).email || "").toLowerCase();
   if (!email) return false;
-  const rows = await db(`staff?select=email&email=ilike.${encodeURIComponent(email.replace(/[%_*,()]/g, (c) => "\\" + c))}`);
-  return !!rows && rows.some((r: { email: string }) => r.email.toLowerCase() === email);
+  const row = (await db(`staff?select=*&email=ilike.${encodeURIComponent(email.replace(/[%_*,()]/g, (c) => "\\" + c))}`) || []).find((r: { email: string }) => r.email.toLowerCase() === email);
+  return !!row && (!row.role || row.role !== "crew");   // crew logins cannot send email (role column exists once supabase/roles.sql has been run)
 }
 async function isScheduler(req: Request): Promise<boolean> {
   const got = req.headers.get("x-cron-secret") || "";

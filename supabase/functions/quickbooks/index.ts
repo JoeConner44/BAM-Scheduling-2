@@ -51,8 +51,9 @@ async function requireStaff(req: Request): Promise<string> {
   if (!u.ok) throw new Error("not signed in");
   const email = String((await u.json()).email || "").toLowerCase();
   if (!email) throw new Error("not signed in");
-  const rows = await db(`staff?select=email&email=ilike.${encodeURIComponent(email.replace(/[%_*,()]/g, (c) => "\\" + c))}`);
-  if (!rows || !rows.some((r: { email: string }) => r.email.toLowerCase() === email)) throw new Error("not on the staff list");
+  const row = (await db(`staff?select=*&email=ilike.${encodeURIComponent(email.replace(/[%_*,()]/g, (c) => "\\" + c))}`) || []).find((r: { email: string }) => r.email.toLowerCase() === email);
+  if (!row) throw new Error("not on the staff list");
+  if (row.role && !["owner", "office", "bookkeeper"].includes(row.role)) throw new Error("your role cannot use QuickBooks");   // role column exists once supabase/roles.sql has been run
   return email;
 }
 

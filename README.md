@@ -18,11 +18,27 @@ Data is saved in your browser (localStorage). Use **Settings → Export JSON** t
 | **Scheduling & Dispatch** | Drag-and-drop week board by crew, multi-day jobs, unscheduled tray, day dispatch sheet (print/copy for crews) |
 | **Job Sites** | Mobile-friendly job page: start/complete, daily logs (weather, crew, tons), checklists, photos |
 | **Change orders & progress billing** | Change orders that revise the contract once approved, a schedule of values, pay applications with retainage (held and released) laid out like an AIA G702/G703, an invoice created from each application, and all of it printable or emailed as a PDF |
+| **Crew time tracking & roles** | Phone-friendly crew view (clock in/out per job, checklist, notes, photos), timesheets with approval and posting to job costing, and five roles with database-enforced limits for crew and estimators |
 | **Job Costing** | Budget vs actual by material/labor/equipment/other, live margin, cross-job costing table |
 | **Customer Portal** | Per-customer page: sign proposals, track project status & updates, view/pay invoices, message the office |
 | **Analytics** | Pipeline, win rate, cash collected, A/R, margins, charts |
 | **Invoicing & Payments** | Invoice from job balance, send, record card/ACH/check payments, overdue tracking |
 | **Automation** | Rules + inbox: signed proposal → create job & alert owner, job complete → draft invoice, budget threshold & overdue alerts, new-lead alerts |
+
+## Roles & crew time tracking
+Run [`supabase/roles.sql`](supabase/roles.sql) once in the SQL Editor to switch roles on. The first person on the staff list becomes the **owner**; add everyone else under **Team & Roles** (each also needs a login under Supabase → Authentication → Users).
+
+| Role | Can do | Enforced by |
+|---|---|---|
+| Owner | Everything, plus the team list | database |
+| Office | Everything except the team list | database |
+| Bookkeeper | Same data as office; the app shows the money pages | app only |
+| Estimator | No invoices, no private settings (API keys, pay rates) | database |
+| Crew | Phone view only: their jobs, clock in/out, checklist, notes, photos. No prices, costs or other customers | database |
+
+Crew logins never touch the data tables; their phone talks to a handful of database functions that return job-site information only. Clocked time appears under **Timesheets**, where it is approved and posted to job costing as labor.
+
+If you have already installed the `quickbooks` or `email` Edge Functions, paste the updated files over them so crew logins cannot use them.
 
 ## Email & follow-ups
 Proposals and invoices can be emailed from the app (PDF attached, with a button to the customer's portal), and follow-ups on unsigned proposals and overdue invoices go out automatically on a schedule you set under **Email & Follow-ups**. One-time setup:
