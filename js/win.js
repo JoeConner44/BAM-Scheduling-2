@@ -59,9 +59,9 @@ VIEWS.dashboard = () => {
 
 /* click a dashboard figure to see what is behind it */
 ACT.kpiList = el => {
-  const k = el.dataset.k, jobRow = (j, date, dateLabel) => ({ href: '#/jobs/' + j.id, name: j.name, sub: custName(j.customerId) + (j.address ? ' · ' + j.address : ''), date, dateLabel, status: j.status, val: jobContract(j) });
+  const k = el.dataset.k, jobRow = (j, date, dateLabel) => ({ href: '#/jobs/' + j.id, name: j.name, sub: custName(j.customerId) + (j.address ? ' · ' + j.address : ''), date, dateLabel, status: j.status, val: jobContract(j), seal: jobSealcoat(j) });
   const sets = {
-    open: () => ({ title: 'Open proposals', valLabel: 'Total', rows: DB.estimates.filter(isOpenEst).map(e => ({ href: '#/estimates/' + e.id, name: e.title, sub: estCustLabel(e) + (e.address ? ' · ' + e.address : ''), date: e.createdAt, dateLabel: 'Proposal date', status: e.status, val: estTotals(e).total, dot: ageColor(e) })) }),
+    open: () => ({ title: 'Open proposals', valLabel: 'Total', rows: DB.estimates.filter(isOpenEst).map(e => ({ href: '#/estimates/' + e.id, name: e.title, sub: estCustLabel(e) + (e.address ? ' · ' + e.address : ''), date: e.createdAt, dateLabel: 'Proposal date', status: e.status, val: estTotals(e).total, dot: ageColor(e), seal: hasSealcoat(e) })) }),
     backlog: () => ({ title: 'Contracted, not completed', valLabel: 'Contract', rows: DB.jobs.filter(j => j.status !== 'complete').map(j => jobRow(j, j.date, 'Scheduled')) }),
     done: () => ({ title: 'Completed jobs', valLabel: 'Contract', rows: DB.jobs.filter(j => j.status === 'complete').map(j => jobRow(j, j.completedAt || j.date, 'Completed')) }),
     active: () => ({ title: 'Jobs in progress', valLabel: 'Contract', rows: DB.jobs.filter(j => j.status === 'in-progress').map(j => jobRow(j, j.date, 'Started')) }),
@@ -72,11 +72,12 @@ ACT.kpiList = el => {
     const rows = [...d.rows].sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'date' ? String(b.date || '').localeCompare(String(a.date || '')) : b.val - a.val);
     const th = (key, label, cls = '') => `<th class="${cls} sortable ${sort === key ? 'on' : ''}" data-sort="${key}">${label}</th>`;
     modal(`<h3>${esc(d.title)} — ${rows.length} · ${money(rows.reduce((a, r) => a + r.val, 0))}</h3>
-      <input type="search" id="kpiQ" placeholder="Filter by job, customer or city…" style="max-width:none;margin-bottom:10px">
+      <div class="toolbar" style="margin-bottom:10px"><input type="search" id="kpiQ" class="grow" placeholder="Filter by job, customer or city…" style="max-width:none"><label class="check sm"><input type="checkbox" id="kpiSeal"> <span class="star">★</span> Sealcoating only (${rows.filter(r => r.seal).length})</label></div>
       <div class="scroll" style="max-height:62vh;overflow:auto"><table class="hover" id="kpiT"><tr>${th('name', 'Job')}${th('date', d.rows[0] ? d.rows[0].dateLabel : 'Date')}<th>Status</th>${th('val', d.valLabel, 'num')}</tr>
-      ${rows.map(r => `<tr data-href="${r.href}" data-t="${esc((r.name + ' ' + r.sub).toLowerCase())}"><td>${r.dot ? `<span class="dot ${r.dot}"></span>` : ''}<b>${esc(r.name)}</b><br><small>${esc(r.sub)}</small></td><td>${r.date ? fmtD(r.date) : '—'}</td><td>${badge(r.status)}</td><td class="num">${money(r.val)}</td></tr>`).join('') || `<tr><td colspan="4">${empty('Nothing here yet')}</td></tr>`}</table></div>
-      <p class="hint">Click a row to open it. Click a column heading to sort.</p>`, { wide: true });
-    $('#kpiQ').oninput = e => { const q = e.target.value.toLowerCase(); $$('#kpiT tr[data-t]').forEach(tr => { tr.style.display = tr.dataset.t.includes(q) ? '' : 'none'; }); };
+      ${rows.map(r => `<tr data-href="${r.href}" data-seal="${r.seal ? 1 : 0}" data-t="${esc((r.name + ' ' + r.sub).toLowerCase())}"><td>${r.dot ? `<span class="dot ${r.dot}"></span>` : ''}<b>${esc(r.name)}</b>${sealStar(r.seal)}<br><small>${esc(r.sub)}</small></td><td>${r.date ? fmtD(r.date) : '—'}</td><td>${badge(r.status)}</td><td class="num">${money(r.val)}</td></tr>`).join('') || `<tr><td colspan="4">${empty('Nothing here yet')}</td></tr>`}</table></div>
+      <p class="hint">Click a row to open it. Click a column heading to sort. <span class="star">★</span> = sealcoating was proposed.</p>`, { wide: true });
+    const filt = () => { const q = $('#kpiQ').value.toLowerCase(), only = $('#kpiSeal').checked; $$('#kpiT tr[data-t]').forEach(tr => { tr.style.display = tr.dataset.t.includes(q) && (!only || tr.dataset.seal === '1') ? '' : 'none'; }); };
+    $('#kpiQ').oninput = filt; $('#kpiSeal').onchange = filt;
     $('#kpiT').onclick = e => { const h = e.target.closest('[data-sort]'), tr = e.target.closest('tr[data-href]'); if (h) { sort = h.dataset.sort; paint(); } else if (tr) { if (tr.dataset.href.startsWith('#/jobs/')) jobTab = 'overview'; location.hash = tr.dataset.href; } };
   };
   paint();
@@ -144,7 +145,7 @@ VIEWS.estimates = args => {
     <label class="inl">Proposal date from <input type="date" id="estFrom" value="${estFrom}"></label><label class="inl">to <input type="date" id="estTo" value="${estTo}"></label>${estFrom || estTo || estColor !== 'all' ? '<button class="btn sm" data-act="estClear">Clear filters</button>' : ''}
     <span class="grow"></span><b>${list.length} shown · ${money(list.reduce((a, e) => a + estTotals(e).total, 0))}</b></div>
   <div class="card flush"><table class="hover"><tr><th>#</th><th>Project</th><th>Customer</th><th>Proposal date</th><th>Age</th><th class="num">Total</th><th>Status</th></tr>
-  ${list.map(e => { const t = estTotals(e), o = isOpenEst(e); return `<tr class="${o ? 'age-' + ageColor(e) : ''}" onclick="location.hash='#/estimates/${e.id}'"><td>${e.number}</td><td><b>${esc(e.title)}</b><br><small>${esc(e.address)}</small></td><td>${esc(estCustLabel(e))}${e.bidDue && o ? `<br><small class="${dueClass(e.bidDue)}">bid due ${fmtShort(e.bidDue)}</small>` : ''}</td><td>${fmtD(e.createdAt)}</td><td>${o ? `<span class="dot ${ageColor(e)}"></span>${estAge(e)} d` : '—'}</td><td class="num">${money(t.total)}</td><td>${badge(e.status)}</td></tr>`; }).join('') || `<tr><td colspan="7">${empty('No proposals match', 'Change the filters or create a new estimate')}</td></tr>`}</table></div>
+  ${list.map(e => { const t = estTotals(e), o = isOpenEst(e); return `<tr class="${o ? 'age-' + ageColor(e) : ''}" onclick="location.hash='#/estimates/${e.id}'"><td>${e.number}</td><td><b>${esc(e.title)}</b>${sealStar(hasSealcoat(e))}<br><small>${esc(e.address)}</small></td><td>${esc(estCustLabel(e))}${e.bidDue && o ? `<br><small class="${dueClass(e.bidDue)}">bid due ${fmtShort(e.bidDue)}</small>` : ''}</td><td>${fmtD(e.createdAt)}</td><td>${o ? `<span class="dot ${ageColor(e)}"></span>${estAge(e)} d` : '—'}</td><td class="num">${money(t.total)}</td><td>${badge(e.status)}</td></tr>`; }).join('') || `<tr><td colspan="7">${empty('No proposals match', 'Change the filters or create a new estimate')}</td></tr>`}</table></div>
   <p class="hint">Open proposals are colored by proposal date: green = last 90 days, yellow = 90–180 days, red = older than 180 days.</p>`,
     mount() { $('#estFrom').onchange = e => { estFrom = e.target.value; render(); }; $('#estTo').onchange = e => { estTo = e.target.value; render(); }; }
   };
@@ -188,7 +189,7 @@ function estimateEditor(e) {
   const job = DB.jobs.find(j => j.estimateId === e.id);
   return {
     title: `Estimate #${e.number}`, html: `
-    <div class="page-head"><div><a href="#/estimates" class="link">← Estimates</a><h1>#${e.number} · ${esc(e.title)} ${badge(e.status)}</h1></div>
+    <div class="page-head"><div><a href="#/estimates" class="link">← Estimates</a><h1>#${e.number} · ${esc(e.title)} ${badge(e.status)} <button class="starbtn ${hasSealcoat(e) ? 'on' : ''}" data-act="sealToggle" data-id="${e.id}" title="${hasSealcoat(e) ? 'Sealcoating was proposed — click to remove the star' : 'Click to mark that sealcoating was proposed'}">${hasSealcoat(e) ? '★' : '☆'} <small>Sealcoating</small></button></h1></div>
     <div class="btns noprint"><button class="btn" data-act="preview" data-id="${e.id}">Preview proposal</button><a class="btn" href="#/design/${e.id}">🎨 Design</a>
     ${isOpenEst(e) ? `<button class="btn primary" data-act="emailProposal" data-id="${e.id}">✉ Email proposal</button>` : ''}${e.status === 'draft' ? `<button class="btn" data-act="markSent" data-id="${e.id}">Mark sent</button>` : ''}
     ${isOpenEst(e) ? `<button class="btn" data-act="signEst" data-id="${e.id}">Capture signature</button><button class="btn ghost" data-act="declineEst" data-id="${e.id}">Declined</button>` : ''}
@@ -332,3 +333,5 @@ ACT.copyPortal = el => {
   navigator.clipboard.writeText(portalURL(c)).then(() => toast(CLOUD ? 'Portal link copied — send it to the customer' : 'Copied (demo mode: only works on this device — set up the backend)'), () => prompt('Copy this link:', portalURL(c)));
 };
 ACT.rotatePortal = el => confirmBox('Create a new private link? The old link stops working immediately.', () => { byId('customers', el.dataset.id).portalToken = newToken(); save(); toast('New link created — copy it again'); });
+
+ACT.sealToggle = el => { const e = byId('estimates', el.dataset.id); e.sealcoat = !hasSealcoat(e); save(); render(); toast(e.sealcoat ? 'Starred: sealcoating was proposed' : 'Star removed'); };

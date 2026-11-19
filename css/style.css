@@ -159,3 +159,4 @@ table.pa td{padding:3px 6px}table.pa input.n{min-width:96px}.proposal .pasum td:
 table th.today{background:rgba(245,158,11,.12)}
 .kpi.click{cursor:pointer;transition:.12s}.kpi.click:hover{border-color:var(--acc);box-shadow:0 2px 10px rgba(0,0,0,.12)}.kpi.click span:after{content:" \203A";color:var(--acc);font-weight:700}table.hover tr[data-href]{cursor:pointer}
 .brand{align-items:flex-start;font-size:15px;line-height:1.25}.brand .logo{flex:none;margin-top:1px}.brand small{display:block;color:#9aa1ad;font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+.star{color:#eab308;margin-left:6px;font-size:1.05em}.starbtn{border:1px solid var(--line);background:var(--card);color:var(--mut);border-radius:99px;padding:2px 10px;font-size:15px;vertical-align:middle;white-space:nowrap}.starbtn small{font-size:11px;font-weight:600}.starbtn.on{color:#a16207;border-color:#eab308;background:#fef9c3}span.starbtn{display:inline-block}

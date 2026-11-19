@@ -96,6 +96,18 @@ const jobBudget = j => Object.values(j.budget).reduce((a, b) => a + (+b || 0), 0
 const jobBaseContract = j => { const e = byId('estimates', j.estimateId); return e ? estTotals(e).total : (+j.contract || 0); };   // original contract
 const jobContract = j => jobBaseContract(j) + (j.changeOrders || []).filter(c => c.status === 'approved').reduce((a, c) => a + (+c.amount || 0), 0);   // revised: plus approved change orders
 const priv = () => DB.private || (DB.private = {});   // staff-only settings (API keys); synced as its own record, not exposed to portals
+/* Was sealcoating proposed? A manual star on the proposal wins; otherwise look for it in the title, line items and notes.
+   "Crack seal" alone does not count. */
+const SEAL_RE = /seal\s*-?\s*coat|seal\s*(?:&|and|\+|\/)\s*(?:re-?)?strip|\bsealer\b/i;
+const SEAL_NEG = /(?:\bno|\bwithout)\s+seal\s*-?\s*coat\w*|seal\s*-?\s*coat\w*[^.;|]{0,40}?\b(?:none|not)\s+(?:proposed|priced|included|bid|in scope)/gi;
+function hasSealcoat(e) {
+  if (!e) return false;
+  if (e.sealcoat === true || e.sealcoat === false) return e.sealcoat;
+  const text = [e.title, e.notes, ...(e.lines || []).map(l => (l.desc || '') + ' ' + (l.note || '')), ...(e.rows || []).map(r => (DB.settings.services.find(s => s.id === r.service) || {}).name + ' ' + (r.label || ''))].join(' ');
+  return SEAL_RE.test(text.replace(SEAL_NEG, ' '));      // ignore mentions that say it was NOT proposed
+}
+const jobSealcoat = j => { const e = j && DB.estimates.find(x => x.id === j.estimateId); return e ? hasSealcoat(e) : SEAL_RE.test((j && j.name) || ''); };
+const sealStar = on => on ? '<span class="star" title="Sealcoating was proposed">★</span>' : '';
 const byId = (coll, id) => DB[coll].find(x => x.id === id);
 const custName = id => (byId('customers', id) || { name: '(deleted)' }).name;
 const nextNum = k => ++DB.seq[k];
