@@ -29,14 +29,14 @@ VIEWS.dashboard = () => {
   return {
     title: 'Dashboard', html: `
     <div class="kpis">
-      <div class="kpi"><span>Open pipeline</span><b>${money(open.reduce((a, e) => a + T(e), 0))}</b><small>${open.length} proposals out</small></div>
+      <div class="kpi click" data-act="kpiList" data-k="open" title="Click to see the list"><span>Open pipeline</span><b>${money(open.reduce((a, e) => a + T(e), 0))}</b><small>${open.length} proposals out</small></div>
       <div class="kpi"><span>Win rate</span><b>${winRate}%</b><small>${signed.length} signed of ${decided}</small></div>
-      <div class="kpi"><span>Contract backlog</span><b>${money(backlog.reduce((a, j) => a + jobContract(j), 0))}</b><small>${backlog.length} jobs signed, not finished</small></div>
-      <div class="kpi"><span>Completed work</span><b>${money(finished.reduce((a, j) => a + jobContract(j), 0))}</b><small>${finished.length} jobs finished</small></div>
+      <div class="kpi click" data-act="kpiList" data-k="backlog" title="Click to see the list"><span>Contract backlog</span><b>${money(backlog.reduce((a, j) => a + jobContract(j), 0))}</b><small>${backlog.length} jobs signed, not finished</small></div>
+      <div class="kpi click" data-act="kpiList" data-k="done" title="Click to see the list"><span>Completed work</span><b>${money(finished.reduce((a, j) => a + jobContract(j), 0))}</b><small>${finished.length} jobs finished</small></div>
       <div class="kpi"><span>Collected (all time)</span><b>${money(pays.reduce((a, p) => a + +p.amount, 0))}</b><small>${pays.length} payments</small></div>
-      <div class="kpi ${overdue.length ? 'warn' : ''}"><span>Outstanding A/R</span><b>${money(ar)}</b><small>${overdue.length} overdue</small></div>
+      <div class="kpi click ${overdue.length ? 'warn' : ''}" data-act="kpiList" data-k="ar" title="Click to see the list"><span>Outstanding A/R</span><b>${money(ar)}</b><small>${overdue.length} overdue</small></div>
       <div class="kpi"><span>Margin, completed jobs</span><b>${margin === null ? '—' : margin + '%'}</b><small>${done.length} jobs with costs logged</small></div>
-      <div class="kpi"><span>Active jobs</span><b>${DB.jobs.filter(j => j.status === 'in-progress').length}</b><small>${thisWeek.length} on this week’s board</small></div>
+      <div class="kpi click" data-act="kpiList" data-k="active" title="Click to see the list"><span>Active jobs</span><b>${DB.jobs.filter(j => j.status === 'in-progress').length}</b><small>${thisWeek.length} on this week’s board</small></div>
     </div>
     <div class="cols">
       <div class="card"><h3>Completed work by month</h3>${barChart(doneMonths)}</div>
@@ -55,6 +55,31 @@ VIEWS.dashboard = () => {
       ${jobMargins.length ? `<table><tr><th>Job</th><th>Contract</th><th>Cost</th><th>Margin</th></tr>${jobMargins.map(({ j, m }) => `<tr><td><a href="#/jobs/${j.id}">${esc(j.name)}</a></td><td>${money(jobContract(j))}</td><td>${money(jobCost(j))}</td><td>${j.status === 'complete' ? `<b class="${m < 15 ? 'neg' : 'pos'}">${num(m, 0)}%</b>` : `<span class="muted">in progress</span>`}</td></tr>`).join('')}</table>` : empty('No costs yet')}
     </div>`
   };
+};
+
+/* click a dashboard figure to see what is behind it */
+ACT.kpiList = el => {
+  const k = el.dataset.k, jobRow = (j, date, dateLabel) => ({ href: '#/jobs/' + j.id, name: j.name, sub: custName(j.customerId) + (j.address ? ' · ' + j.address : ''), date, dateLabel, status: j.status, val: jobContract(j) });
+  const sets = {
+    open: () => ({ title: 'Open proposals', valLabel: 'Total', rows: DB.estimates.filter(isOpenEst).map(e => ({ href: '#/estimates/' + e.id, name: e.title, sub: estCustLabel(e) + (e.address ? ' · ' + e.address : ''), date: e.createdAt, dateLabel: 'Proposal date', status: e.status, val: estTotals(e).total, dot: ageColor(e) })) }),
+    backlog: () => ({ title: 'Contracted, not completed', valLabel: 'Contract', rows: DB.jobs.filter(j => j.status !== 'complete').map(j => jobRow(j, j.date, 'Scheduled')) }),
+    done: () => ({ title: 'Completed jobs', valLabel: 'Contract', rows: DB.jobs.filter(j => j.status === 'complete').map(j => jobRow(j, j.completedAt || j.date, 'Completed')) }),
+    active: () => ({ title: 'Jobs in progress', valLabel: 'Contract', rows: DB.jobs.filter(j => j.status === 'in-progress').map(j => jobRow(j, j.date, 'Started')) }),
+    ar: () => ({ title: 'Unpaid invoices', valLabel: 'Balance', rows: DB.invoices.filter(i => invStatus(i) !== 'draft' && invBalance(i) > 0.005).map(i => { const j = i.jobId && byId('jobs', i.jobId); return { href: j ? '#/jobs/' + j.id : '#/invoices', name: `Invoice #${i.number}${j ? ' — ' + j.name : ''}`, sub: custName(i.customerId), date: i.due, dateLabel: 'Due', status: invStatus(i), val: invBalance(i) }; }) }),
+  };
+  const d = sets[k](); let sort = 'val';
+  const paint = () => {
+    const rows = [...d.rows].sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'date' ? String(b.date || '').localeCompare(String(a.date || '')) : b.val - a.val);
+    const th = (key, label, cls = '') => `<th class="${cls} sortable ${sort === key ? 'on' : ''}" data-sort="${key}">${label}</th>`;
+    modal(`<h3>${esc(d.title)} — ${rows.length} · ${money(rows.reduce((a, r) => a + r.val, 0))}</h3>
+      <input type="search" id="kpiQ" placeholder="Filter by job, customer or city…" style="max-width:none;margin-bottom:10px">
+      <div class="scroll" style="max-height:62vh;overflow:auto"><table class="hover" id="kpiT"><tr>${th('name', 'Job')}${th('date', d.rows[0] ? d.rows[0].dateLabel : 'Date')}<th>Status</th>${th('val', d.valLabel, 'num')}</tr>
+      ${rows.map(r => `<tr data-href="${r.href}" data-t="${esc((r.name + ' ' + r.sub).toLowerCase())}"><td>${r.dot ? `<span class="dot ${r.dot}"></span>` : ''}<b>${esc(r.name)}</b><br><small>${esc(r.sub)}</small></td><td>${r.date ? fmtD(r.date) : '—'}</td><td>${badge(r.status)}</td><td class="num">${money(r.val)}</td></tr>`).join('') || `<tr><td colspan="4">${empty('Nothing here yet')}</td></tr>`}</table></div>
+      <p class="hint">Click a row to open it. Click a column heading to sort.</p>`, { wide: true });
+    $('#kpiQ').oninput = e => { const q = e.target.value.toLowerCase(); $$('#kpiT tr[data-t]').forEach(tr => { tr.style.display = tr.dataset.t.includes(q) ? '' : 'none'; }); };
+    $('#kpiT').onclick = e => { const h = e.target.closest('[data-sort]'), tr = e.target.closest('tr[data-href]'); if (h) { sort = h.dataset.sort; paint(); } else if (tr) { if (tr.dataset.href.startsWith('#/jobs/')) jobTab = 'overview'; location.hash = tr.dataset.href; } };
+  };
+  paint();
 };
 
 /* ================= CRM ================= */
