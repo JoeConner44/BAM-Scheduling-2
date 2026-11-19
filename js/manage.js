@@ -253,14 +253,15 @@ function previewProjectImport(f) {
   if (!f || f.asphaltproImport !== 1) return toast('Not a valid projects file', 'err');
   f.projects = Array.isArray(f.projects) ? f.projects : [];
   const newPB = (f.priceBook || []).filter(p => p.name && !pbFind(p.name));
+  const sealSet = new Set(f.sealcoat || []), toStar = DB.estimates.filter(e => e.importKey && sealSet.has(e.importKey) && e.sealcoat === undefined && !hasSealcoat(e));
   const haveKeys = new Set(DB.estimates.map(e => e.importKey).filter(Boolean)), haveCust = new Set(DB.customers.map(c => normName(c.name)));
   const fresh = f.projects.filter(p => p.key && !haveKeys.has(p.key)), newCust = [...new Set(fresh.map(p => normName(p.customer)))].filter(n => n && !haveCust.has(n));
   const jobs = fresh.filter(p => p.job).length, tot = fresh.reduce((a, p) => a + (+p.total || 0), 0);
-  modal(`<h3>Import projects</h3><table><tr><td>New proposals</td><td class="num"><b>${fresh.length}</b></td></tr><tr><td>…of which become jobs</td><td class="num"><b>${jobs}</b></td></tr><tr><td>New customers</td><td class="num"><b>${newCust.length}</b></td></tr><tr><td>Total value</td><td class="num"><b>${money(tot)}</b></td></tr>${f.priceBook ? `<tr><td>New price book items</td><td class="num"><b>${newPB.length}</b></td></tr>` : ''}<tr><td>Already imported (skipped)</td><td class="num">${f.projects.length - fresh.length}</td></tr></table>
+  modal(`<h3>Import projects</h3><table><tr><td>New proposals</td><td class="num"><b>${fresh.length}</b></td></tr><tr><td>…of which become jobs</td><td class="num"><b>${jobs}</b></td></tr><tr><td>New customers</td><td class="num"><b>${newCust.length}</b></td></tr><tr><td>Total value</td><td class="num"><b>${money(tot)}</b></td></tr>${f.priceBook ? `<tr><td>New price book items</td><td class="num"><b>${newPB.length}</b></td></tr>` : ''}${f.sealcoat ? `<tr><td>Proposals to star for sealcoating</td><td class="num"><b>${toStar.length}</b></td></tr><tr><td>…already starred</td><td class="num">${DB.estimates.filter(e => e.importKey && sealSet.has(e.importKey) && hasSealcoat(e)).length}</td></tr>` : ''}<tr><td>Already imported (skipped)</td><td class="num">${f.projects.length - fresh.length}</td></tr></table>
   ${f.settings ? `<label class="check"><input type="checkbox" id="impSet" checked> Also update company info and default proposal terms</label>` : ''}
   <p class="hint">Nothing existing is changed or deleted. No alerts or invoices are created for imported records.</p>
-  <div class="actions"><button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" id="impGo" ${fresh.length || f.settings || newPB.length ? '' : 'disabled'}>Import</button></div>`);
-  $('#impGo').onclick = () => { const withSet = $('#impSet') && $('#impSet').checked; closeModal(); newPB.forEach(p => priceBook().push({ id: uid('pb'), name: String(p.name).trim(), unit: p.unit || 'EA', price: +p.price || 0 })); applyProjectImport(fresh, withSet ? f.settings : null); };
+  <div class="actions"><button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" id="impGo" ${fresh.length || f.settings || newPB.length || toStar.length ? '' : 'disabled'}>Import</button></div>`);
+  $('#impGo').onclick = () => { const withSet = $('#impSet') && $('#impSet').checked; closeModal(); toStar.forEach(e => { e.sealcoat = true; }); newPB.forEach(p => priceBook().push({ id: uid('pb'), name: String(p.name).trim(), unit: p.unit || 'EA', price: +p.price || 0 })); applyProjectImport(fresh, withSet ? f.settings : null); };
 }
 function applyProjectImport(projects, settings) {
   if (settings) Object.assign(DB.settings, settings);
@@ -283,7 +284,7 @@ function applyProjectImport(projects, settings) {
       DB.jobs.push(j);
     }
   });
-  save(); render(); toast(`Imported ${projects.length} project${projects.length === 1 ? '' : 's'}`);
+  save(); render(); toast(projects.length ? `Imported ${projects.length} project${projects.length === 1 ? '' : 's'}` : 'Updated');
 }
 
 ACT.copyPayLink = el => { const i = byId('invoices', el.dataset.id); navigator.clipboard.writeText(i.payLink).then(() => toast('QuickBooks payment link copied'), () => prompt('Copy this link:', i.payLink)); };
