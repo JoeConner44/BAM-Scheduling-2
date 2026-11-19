@@ -241,7 +241,7 @@ CHG.set = el => { DB.settings[el.dataset.set] = el.value; save(); };
 CHG.svc = el => { const s = svc(el.dataset.svc); s[el.dataset.f] = el.dataset.f === 'price' ? +el.value : el.value; save(); };
 ACT.addSvc = () => { DB.settings.services.push({ id: uid('s'), name: 'New service', unit: 'sqft', price: 1 }); save(); render(); };
 ACT.delSvc = el => { if (DB.settings.services.length < 2) return; DB.settings.services = DB.settings.services.filter(s => s.id !== el.dataset.id); save(); render(); };
-ACT.exportData = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' })); a.download = `asphaltpro-backup-${today()}.json`; a.click(); };
+ACT.exportData = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' })); a.download = `bam-dashboard-backup-${today()}.json`; a.click(); };
 ACT.resetData = () => confirmBox('Replace everything with fresh demo data?', () => { resetDemo(); runChecks(); location.hash = '#/dashboard'; render(); });
 ACT.clearData = () => confirmBox('Delete ALL data and start with an empty company?', () => { const s = DB.settings; DB = seed(); Object.assign(DB, { customers: [], estimates: [], jobs: [], invoices: [], notifications: [] }); DB.settings = s; save(); location.hash = '#/dashboard'; render(); });
 

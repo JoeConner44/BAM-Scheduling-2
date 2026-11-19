@@ -1,4 +1,4 @@
-# AsphaltPro
+# Brown's Asphalt Maintenance Dashboard
 
 A no-build, no-server web app for an asphalt paving company: win work, manage jobs, run the business.
 Pure HTML/CSS/JS — open `index.html` or host it free on **GitHub Pages**.

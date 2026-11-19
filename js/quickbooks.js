@@ -105,7 +105,7 @@ async function qboPush(list) {
   for (const i of list) {
     try {
       const c = byId('customers', i.customerId), cid = await qboEnsureCustomer(c), job = i.jobId && byId('jobs', i.jobId);
-      const data = { CustomerRef: { value: cid }, TxnDate: i.issued, DueDate: i.due, PrivateNote: `From AsphaltPro invoice #${i.number}${job ? ' — ' + job.name : ''}`,
+      const data = { CustomerRef: { value: cid }, TxnDate: i.issued, DueDate: i.due, PrivateNote: `From the BAM Dashboard, invoice #${i.number}${job ? ' — ' + job.name : ''}`,
         Line: i.items.filter(l => (+l.qty || 0) * (+l.price || 0) !== 0).map(l => ({ DetailType: 'SalesItemLineDetail', Amount: Math.round((+l.qty || 0) * (+l.price || 0) * 100) / 100, Description: String(l.desc || '').slice(0, 4000), SalesItemLineDetail: { ItemRef: { value: itemId }, Qty: +l.qty || 1, UnitPrice: +l.price || 0 } })) };
       let q;
       if (qboCfg().onlinePay !== false && c.email) {      // let the customer pay this invoice online through QuickBooks Payments

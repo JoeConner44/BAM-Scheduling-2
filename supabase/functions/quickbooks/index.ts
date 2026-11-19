@@ -1,4 +1,4 @@
-// QuickBooks Online bridge for AsphaltPro — Supabase Edge Function (Deno). No imports needed.
+// QuickBooks Online bridge for the Brown's Asphalt Maintenance Dashboard — Supabase Edge Function (Deno). No imports needed.
 //
 // Why this exists: QuickBooks will not let a website hold its client secret, so sign-in, token storage/refresh and
 // the API calls happen here. Tokens live in public.qbo_tokens, which only this function (service role) can read.

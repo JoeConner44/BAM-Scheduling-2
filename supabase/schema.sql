@@ -1,4 +1,4 @@
--- AsphaltPro shared backend for Supabase. Run once in: Supabase dashboard -> SQL Editor.
+-- Brown's Asphalt Maintenance Dashboard: shared backend for Supabase. Run once in: Supabase dashboard -> SQL Editor.
 -- Staff (logged-in, on the allowlist) get full access. Customers get NO table access;
 -- they reach only their own sanitized data through the portal_* functions below,
 -- using their private portal token.

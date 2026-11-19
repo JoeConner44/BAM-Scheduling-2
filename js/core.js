@@ -1,4 +1,4 @@
-/* AsphaltPro core: helpers, data store, seed data, automation engine */
+/* Brown's Asphalt Maintenance Dashboard core: helpers, data store, seed data, automation engine */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

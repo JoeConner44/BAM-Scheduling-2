@@ -20,7 +20,7 @@ function render() {
   $('#title').textContent = out.title;
   $('#bell').innerHTML = `🔔${unread ? `<b class="pill">${unread}</b>` : ''}`;
   $('#main').innerHTML = out.html;
-  document.title = out.title + ' · AsphaltPro';
+  document.title = out.title + " · Brown's Asphalt Maintenance Dashboard";
   pbDatalist();
   if (out.mount) out.mount();
 }

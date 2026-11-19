@@ -106,7 +106,7 @@ async function processPortalEvents() {
 async function cloudSession() { const { data } = await SB.auth.getSession(); return data.session; }
 function showGate(html) { document.body.classList.add('portal-mode'); $('#title').textContent = ''; $('#main').innerHTML = `<div class="gate card">${html}</div>`; }
 function showLogin(msg) {
-  showGate(`<h1>${esc((DB && DB.settings && DB.settings.company) || 'AsphaltPro')}</h1><p class="muted">Staff sign-in</p>${msg ? `<p class="neg">${esc(msg)}</p>` : ''}
+  showGate(`<h1>${esc((DB && DB.settings && DB.settings.company) || "Brown's Asphalt Maintenance Dashboard")}</h1><p class="muted">Staff sign-in</p>${msg ? `<p class="neg">${esc(msg)}</p>` : ''}
   <form id="loginForm"><label class="block"><span>Email</span><input type="email" name="email" required autocomplete="username"></label><label class="block"><span>Password</span><input type="password" name="pw" required autocomplete="current-password"></label><button class="btn primary" style="width:100%;justify-content:center">Sign in</button></form>`);
   $('#loginForm').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); const { error } = await SB.auth.signInWithPassword({ email: f.get('email'), password: f.get('pw') }); if (error) showLogin(error.message); else location.reload(); };
 }

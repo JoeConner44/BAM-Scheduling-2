@@ -1,4 +1,4 @@
-// Email sender + automatic follow-ups for AsphaltPro — Supabase Edge Function (Deno). No imports needed.
+// Email sender + automatic follow-ups for the Brown's Asphalt Maintenance Dashboard — Supabase Edge Function (Deno). No imports needed.
 //
 // Sends through Resend (https://resend.com). Deploy with "Verify JWT" turned OFF: the daily schedule calls this
 // function without a login, so every request is checked here instead — either a signed-in staff member, or the
