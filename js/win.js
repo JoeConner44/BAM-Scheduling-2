@@ -75,9 +75,10 @@ ACT.kpiList = el => {
       <div class="toolbar" style="margin-bottom:10px"><input type="search" id="kpiQ" class="grow" placeholder="Filter by job, customer or city…" style="max-width:none"><label class="check sm"><input type="checkbox" id="kpiSeal"> <span class="star">★</span> Sealcoating only (${rows.filter(r => r.seal).length})</label></div>
       <div class="scroll" style="max-height:62vh;overflow:auto"><table class="hover" id="kpiT"><tr>${th('name', 'Job')}${th('date', d.rows[0] ? d.rows[0].dateLabel : 'Date')}<th>Status</th>${th('val', d.valLabel, 'num')}</tr>
       ${rows.map(r => `<tr data-href="${r.href}" data-seal="${r.seal ? 1 : 0}" data-t="${esc((r.name + ' ' + r.sub).toLowerCase())}"><td>${r.dot ? `<span class="dot ${r.dot}"></span>` : ''}<b>${esc(r.name)}</b>${sealStar(r.seal)}<br><small>${esc(r.sub)}</small></td><td>${r.date ? fmtD(r.date) : '—'}</td><td>${badge(r.status)}</td><td class="num">${money(r.val)}</td></tr>`).join('') || `<tr><td colspan="4">${empty('Nothing here yet')}</td></tr>`}</table></div>
-      <p class="hint">Click a row to open it. Click a column heading to sort. <span class="star">★</span> = sealcoating was proposed.</p>`, { wide: true });
+      <div class="actions" style="margin-top:10px"><span class="hint grow" style="margin:0">Click a row to open it. Click a column heading to sort. <span class="star">★</span> = sealcoating was proposed.</span><button class="btn primary" id="kpiX">⬇ Export this list</button></div>`, { wide: true });
     const filt = () => { const q = $('#kpiQ').value.toLowerCase(), only = $('#kpiSeal').checked; $$('#kpiT tr[data-t]').forEach(tr => { tr.style.display = tr.dataset.t.includes(q) && (!only || tr.dataset.seal === '1') ? '' : 'none'; }); };
     $('#kpiQ').oninput = filt; $('#kpiSeal').onchange = filt;
+    $('#kpiX').onclick = () => { const q = $('#kpiQ').value.toLowerCase(), only = $('#kpiSeal').checked, out = rows.filter(r => (r.name + ' ' + r.sub).toLowerCase().includes(q) && (!only || r.seal)); downloadCSV(d.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ['Job', 'Customer / location', d.rows[0] ? d.rows[0].dateLabel : 'Date', 'Status', 'Sealcoating', d.valLabel === 'Balance' ? 'Balance' : 'Total price'], out.map(r => [r.name, r.sub, r.date || '', r.status, r.seal ? 'Yes' : 'No', r.val]), [d.valLabel === 'Balance' ? 'Balance' : 'Total price']); };
     $('#kpiT').onclick = e => { const h = e.target.closest('[data-sort]'), tr = e.target.closest('tr[data-href]'); if (h) { sort = h.dataset.sort; paint(); } else if (tr) { if (tr.dataset.href.startsWith('#/jobs/')) jobTab = 'overview'; location.hash = tr.dataset.href; } };
   };
   paint();
@@ -137,10 +138,11 @@ VIEWS.estimates = args => {
   const inDates = e => (!estFrom || e.createdAt >= estFrom) && (!estTo || e.createdAt <= estTo);
   const base = DB.estimates.filter(e => inTab(e, tab) && inDates(e));
   const list = base.filter(e => estColor === 'all' || (isOpenEst(e) && ageColor(e) === estColor)).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.number - a.number);
+  estShown = list; estShownTab = tab;
   const cc = c => base.filter(e => isOpenEst(e) && ageColor(e) === c).length;
   return {
     title: 'Estimates & Proposals', html: `
-  <div class="toolbar"><div class="tabs">${['open', 'draft', 'sent', 'signed', 'declined', 'all'].map(s => `<button class="${tab === s ? 'on' : ''}" data-act="estFilter" data-v="${s}">${s} <i>${DB.estimates.filter(e => inTab(e, s)).length}</i></button>`).join('')}</div><span class="grow"></span><button class="btn primary" data-act="newEstimate">+ New estimate</button></div>
+  <div class="toolbar"><div class="tabs">${['open', 'draft', 'sent', 'signed', 'declined', 'all'].map(s => `<button class="${tab === s ? 'on' : ''}" data-act="estFilter" data-v="${s}">${s} <i>${DB.estimates.filter(e => inTab(e, s)).length}</i></button>`).join('')}</div><span class="grow"></span><button class="btn" data-act="exportEstimates">⬇ Export list</button><button class="btn primary" data-act="newEstimate">+ New estimate</button></div>
   <div class="toolbar"><div class="tabs"><button class="${estColor === 'all' ? 'on' : ''}" data-act="estColor" data-v="all">Any age</button>${['green', 'yellow', 'red'].map(c => `<button class="${estColor === c ? 'on' : ''}" data-act="estColor" data-v="${c}"><span class="dot ${c}"></span>${AGE_LABEL[c]} <i>${cc(c)}</i></button>`).join('')}</div>
     <label class="inl">Proposal date from <input type="date" id="estFrom" value="${estFrom}"></label><label class="inl">to <input type="date" id="estTo" value="${estTo}"></label>${estFrom || estTo || estColor !== 'all' ? '<button class="btn sm" data-act="estClear">Clear filters</button>' : ''}
     <span class="grow"></span><b>${list.length} shown · ${money(list.reduce((a, e) => a + estTotals(e).total, 0))}</b></div>
@@ -151,6 +153,8 @@ VIEWS.estimates = args => {
   };
 };
 ACT.estFilter = el => { estFilter = el.dataset.v; render(); };
+let estShown = [], estShownTab = 'all';
+ACT.exportEstimates = () => downloadCSV('proposals-' + estShownTab, ['#', 'Project', 'Customer', 'Location', 'Proposal date', 'Age (days)', 'Status', 'Sealcoating', 'Total price'], estShown.map(e => [e.number, e.title, estCustLabel(e), e.address || '', e.createdAt || '', estAge(e), e.status, hasSealcoat(e) ? 'Yes' : 'No', estTotals(e).total]), ['Total price']);
 ACT.estColor = el => { estColor = el.dataset.v; render(); };
 ACT.estClear = () => { estColor = 'all'; estFrom = estTo = ''; render(); };
 ACT.newEstimate = () => {

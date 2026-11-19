@@ -67,3 +67,13 @@ function shrinkImage(file, max = 900) {
     r.readAsDataURL(file);
   });
 }
+
+/* download a list as a .csv file that opens in Excel; numbers stay numbers, a TOTAL row is added for the columns named in `sum` */
+function downloadCSV(name, header, rows, sum = []) {
+  const cell = v => { if (typeof v === 'number') return String(Math.round(v * 100) / 100); v = String(v ?? ''); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const all = [header, ...rows];
+  if (sum.length && rows.length) all.push(header.map((h, i) => i === 0 ? 'TOTAL' : sum.includes(h) ? rows.reduce((a, r) => a + (+r[i] || 0), 0) : ''));
+  const blob = new Blob(['﻿' + all.map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${name}-${today()}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  toast(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'} — open the file in Excel`);
+}

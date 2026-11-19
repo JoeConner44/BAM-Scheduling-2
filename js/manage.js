@@ -49,7 +49,7 @@ document.addEventListener('drop', e => {
 /* ================= JOBS & SITE MANAGEMENT ================= */
 let jobFilter = 'all';
 VIEWS.jobs = args => args[0] ? jobDetail(byId('jobs', args[0])) : {
-  title: 'Jobs', html: `<div class="toolbar"><div class="tabs">${['all', 'unscheduled', 'scheduled', 'in-progress', 'complete'].map(s => `<button class="${jobFilter === s ? 'on' : ''}" data-act="jobFilter" data-v="${s}">${s} <i>${DB.jobs.filter(j => s === 'all' || j.status === s).length}</i></button>`).join('')}</div><button class="btn primary" data-act="newJob">+ New job</button></div>
+  title: 'Jobs', html: `<div class="toolbar"><div class="tabs">${['all', 'unscheduled', 'scheduled', 'in-progress', 'complete'].map(s => `<button class="${jobFilter === s ? 'on' : ''}" data-act="jobFilter" data-v="${s}">${s} <i>${DB.jobs.filter(j => s === 'all' || j.status === s).length}</i></button>`).join('')}</div><span class="grow"></span><button class="btn" data-act="exportJobs">⬇ Export list</button><button class="btn primary" data-act="newJob">+ New job</button></div>
   <div class="cards">${DB.jobs.filter(j => jobFilter === 'all' || j.status === jobFilter).map(j => { const cr = byId('crews', j.crewId), pct = jobBudget(j) ? jobCost(j) / jobBudget(j) * 100 : 0, done = j.checklist.filter(c => c.done).length; return `<a class="jobcard" href="#/jobs/${j.id}" style="--c:${cr ? cr.color : '#9ca3af'}"><div>${badge(j.status)}<h3>${esc(j.name)}${sealStar(jobSealcoat(j))}</h3><p>${esc(custName(j.customerId))}<br><small>${esc(j.address)}</small></p></div><div><small>${j.date ? fmtShort(j.date) + ' · ' + j.days + 'd · ' + esc(cr ? cr.name : '') : 'Not scheduled'}</small><small>Checklist ${done}/${j.checklist.length}</small>${bar(done / j.checklist.length * 100, 101)}<small>Budget used ${Math.round(pct)}%</small>${bar(pct)}</div></a>`; }).join('') || empty('No jobs', 'Sign a proposal or create one manually')}</div>`
 };
 ACT.jobFilter = el => { jobFilter = el.dataset.v; render(); };
@@ -128,7 +128,7 @@ VIEWS.costing = () => {
     title: 'Job Costing', html: `<div class="kpis"><div class="kpi"><span>Total contract value</span><b>${money(tot.c)}</b></div><div class="kpi"><span>Cost to date</span><b>${money(tot.k)}</b></div><div class="kpi"><span>Total budget</span><b>${money(tot.b)}</b></div><div class="kpi"><span>Planned margin</span><b>${tot.c ? num((tot.c - tot.b) / tot.c * 100, 0) : 0}%</b></div></div>
     <div class="card flush"><table class="hover"><tr><th>Job</th><th>Status</th><th class="num">Contract</th><th class="num">Budget</th><th class="num">Actual</th><th style="width:18%">Budget used</th><th class="num">Margin $</th><th class="num">Margin %</th></tr>
     ${rows.map(r => `<tr onclick="jobTab='costs';location.hash='#/jobs/${r.j.id}'"><td><b>${esc(r.j.name)}</b><br><small>${esc(custName(r.j.customerId))}</small></td><td>${badge(r.j.status)}</td><td class="num">${money(r.c)}</td><td class="num">${money(r.b)}</td><td class="num">${money(r.k)}</td><td>${bar(r.used)}<small>${Math.round(r.used)}%</small></td><td class="num ${r.m < 0 ? 'neg' : ''}">${money(r.m)}</td><td class="num"><b class="${r.mp < 15 ? 'neg' : 'pos'}">${num(r.mp, 0)}%</b></td></tr>`).join('')}</table></div>
-    <p class="hint">Margin $ = contract − cost to date. Click a job to log costs and edit budgets. Alerts fire when a job passes your budget threshold (Automation).</p>`
+    <div class="btns"><button class="btn" data-act="exportJobsAll">⬇ Export all jobs</button></div><p class="hint">Margin $ = contract − cost to date. Click a job to log costs and edit budgets. Alerts fire when a job passes your budget threshold (Automation).</p>`
   };
 };
 
@@ -288,3 +288,8 @@ function applyProjectImport(projects, settings) {
 }
 
 ACT.copyPayLink = el => { const i = byId('invoices', el.dataset.id); navigator.clipboard.writeText(i.payLink).then(() => toast('QuickBooks payment link copied'), () => prompt('Copy this link:', i.payLink)); };
+
+const JOB_COLS = ['Job', 'Customer', 'Location', 'Status', 'Start date', 'Completed', 'Crew', 'Sealcoating', 'Original contract', 'Approved change orders', 'Total price', 'Invoiced', 'Paid'];
+const jobExportRow = j => [j.name, custName(j.customerId), j.address || '', j.status, j.date || '', j.completedAt || '', (byId('crews', j.crewId) || {}).name || '', jobSealcoat(j) ? 'Yes' : 'No', jobBaseContract(j), coApproved(j), jobContract(j), jobBilled(j), jobPaid(j)];
+ACT.exportJobs = () => { const list = DB.jobs.filter(j => jobFilter === 'all' || j.status === jobFilter).sort((a, b) => a.name.localeCompare(b.name)); downloadCSV('jobs-' + jobFilter, JOB_COLS, list.map(jobExportRow), ['Original contract', 'Approved change orders', 'Total price', 'Invoiced', 'Paid']); };
+ACT.exportJobsAll = () => downloadCSV('jobs-costing', [...JOB_COLS, 'Budget', 'Cost to date', 'Margin'], [...DB.jobs].sort((a, b) => a.name.localeCompare(b.name)).map(j => [...jobExportRow(j), jobBudget(j), jobCost(j), jobContract(j) - jobCost(j)]), ['Original contract', 'Approved change orders', 'Total price', 'Invoiced', 'Paid', 'Budget', 'Cost to date', 'Margin']);
