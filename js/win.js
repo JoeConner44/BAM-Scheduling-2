@@ -128,8 +128,23 @@ ACT.editCustomer = el => { const c = byId('customers', el.dataset.id); openForm(
 ACT.delCustomer = el => confirmBox('Delete this customer? Their estimates, jobs and invoices stay but show as “(deleted)”.', () => { DB.customers = DB.customers.filter(c => c.id !== el.dataset.id); save(); render(); });
 ACT.newEstimateFor = el => { closeModal(); newEstimate(el.dataset.id); };
 
+/* ---------- shared list filters: search, sealcoating, price range, sealcoat SY range, sort ---------- */
+const mkFilt = () => ({ q: '', seal: 'any', vmin: '', vmax: '', symin: '', symax: '', sort: 'date' });
+const FILT_SORTS = [['date', 'Newest first'], ['dateup', 'Oldest first'], ['val', 'Price: high to low'], ['valup', 'Price: low to high'], ['sy', 'Sealcoat SY: high to low'], ['syup', 'Sealcoat SY: low to high'], ['name', 'Name A–Z']];
+const filtActive = F => !!(F.q || F.seal !== 'any' || F.vmin !== '' || F.vmax !== '' || F.symin !== '' || F.symax !== '');
+/* r = { text, seal, val, sy } */
+const filtTest = (F, r) => (!F.q || r.text.toLowerCase().includes(F.q.toLowerCase())) && (F.seal === 'any' || (F.seal === 'yes') === !!r.seal) && (F.vmin === '' || r.val >= +F.vmin) && (F.vmax === '' || r.val <= +F.vmax) && (F.symin === '' || r.sy >= +F.symin) && (F.symax === '' || (r.sy > 0 && r.sy <= +F.symax));
+const filtSort = (F, rows) => { const s = F.sort, k = s.replace('up', ''), dir = s.endsWith('up') ? 1 : -1; return rows.sort((a, b) => k === 'name' ? a.name.localeCompare(b.name) : k === 'date' ? dir * String(a.date || '').localeCompare(String(b.date || '')) : dir * ((a[k] || 0) - (b[k] || 0)) || String(b.date || '').localeCompare(String(a.date || ''))); };
+const filtBarHTML = (F, p, valLabel) => `<div class="toolbar filt"><input type="search" id="${p}Q" class="grow" placeholder="Search name, customer or city…" value="${esc(F.q)}">
+  <label class="inl"><span class="star">★</span> Sealcoating <select id="${p}Seal">${[['any', 'Any'], ['yes', 'Yes'], ['no', 'No']].map(([v, l]) => `<option value="${v}" ${F.seal === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+  <label class="inl">${valLabel} $ <input type="number" id="${p}Vmin" placeholder="min" value="${F.vmin}" style="width:90px"> – <input type="number" id="${p}Vmax" placeholder="max" value="${F.vmax}" style="width:90px"></label>
+  <label class="inl">Sealcoat SY <input type="number" id="${p}Symin" placeholder="min" value="${F.symin}" style="width:80px"> – <input type="number" id="${p}Symax" placeholder="max" value="${F.symax}" style="width:80px"></label>
+  <label class="inl">Sort <select id="${p}Sort">${FILT_SORTS.map(([v, l]) => `<option value="${v}" ${F.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+  ${filtActive(F) ? `<button class="btn sm" id="${p}Clr">Clear</button>` : ''}</div>`;
+const filtMount = (F, p) => { [['Q', 'q'], ['Seal', 'seal'], ['Vmin', 'vmin'], ['Vmax', 'vmax'], ['Symin', 'symin'], ['Symax', 'symax'], ['Sort', 'sort']].forEach(([id, k]) => { const el = $('#' + p + id); if (el) el.onchange = () => { F[k] = el.value.trim(); render(); }; }); const c = $('#' + p + 'Clr'); if (c) c.onclick = () => { Object.assign(F, mkFilt(), { sort: F.sort }); render(); }; };
+
 /* ================= ESTIMATES ================= */
-let estFilter = null, estColor = 'all', estFrom = '', estTo = '';
+let estFilter = null, estColor = 'all', estFrom = '', estTo = ''; const estF = mkFilt();
 const AGE_LABEL = { green: '0–90 days', yellow: '90–180 days', red: 'Over 180 days' };
 VIEWS.estimates = args => {
   if (args[0]) return estimateEditor(byId('estimates', args[0]));
@@ -137,7 +152,7 @@ VIEWS.estimates = args => {
   const inTab = (e, s) => s === 'all' || (s === 'open' ? isOpenEst(e) : e.status === s);
   const inDates = e => (!estFrom || e.createdAt >= estFrom) && (!estTo || e.createdAt <= estTo);
   const base = DB.estimates.filter(e => inTab(e, tab) && inDates(e));
-  const list = base.filter(e => estColor === 'all' || (isOpenEst(e) && ageColor(e) === estColor)).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.number - a.number);
+  const list = filtSort(estF, base.filter(e => estColor === 'all' || (isOpenEst(e) && ageColor(e) === estColor)).map(e => ({ e, name: e.title, date: e.createdAt, text: e.title + ' ' + estCustLabel(e) + ' ' + (e.address || ''), seal: hasSealcoat(e), val: estTotals(e).total, sy: sealSY(e) })).filter(r => filtTest(estF, r))).map(r => r.e);
   estShown = list; estShownTab = tab;
   const cc = c => base.filter(e => isOpenEst(e) && ageColor(e) === c).length;
   return {
@@ -145,18 +160,19 @@ VIEWS.estimates = args => {
   <div class="toolbar"><div class="tabs">${['open', 'draft', 'sent', 'signed', 'declined', 'all'].map(s => `<button class="${tab === s ? 'on' : ''}" data-act="estFilter" data-v="${s}">${s} <i>${DB.estimates.filter(e => inTab(e, s)).length}</i></button>`).join('')}</div><span class="grow"></span><button class="btn" data-act="exportEstimates">⬇ Export list</button><button class="btn primary" data-act="newEstimate">+ New estimate</button></div>
   <div class="toolbar"><div class="tabs"><button class="${estColor === 'all' ? 'on' : ''}" data-act="estColor" data-v="all">Any age</button>${['green', 'yellow', 'red'].map(c => `<button class="${estColor === c ? 'on' : ''}" data-act="estColor" data-v="${c}"><span class="dot ${c}"></span>${AGE_LABEL[c]} <i>${cc(c)}</i></button>`).join('')}</div>
     <label class="inl">Proposal date from <input type="date" id="estFrom" value="${estFrom}"></label><label class="inl">to <input type="date" id="estTo" value="${estTo}"></label>${estFrom || estTo || estColor !== 'all' ? '<button class="btn sm" data-act="estClear">Clear filters</button>' : ''}
-    <span class="grow"></span><b>${list.length} shown · ${money(list.reduce((a, e) => a + estTotals(e).total, 0))}</b></div>
-  <div class="card flush"><table class="hover"><tr><th>#</th><th>Project</th><th>Customer</th><th>Proposal date</th><th>Age</th><th class="num">Total</th><th>Status</th></tr>
-  ${list.map(e => { const t = estTotals(e), o = isOpenEst(e); return `<tr class="${o ? 'age-' + ageColor(e) : ''}" onclick="location.hash='#/estimates/${e.id}'"><td>${e.number}</td><td><b>${esc(e.title)}</b>${sealStar(hasSealcoat(e), sealSY(e))}<br><small>${esc(e.address)}</small></td><td>${esc(estCustLabel(e))}${e.bidDue && o ? `<br><small class="${dueClass(e.bidDue)}">bid due ${fmtShort(e.bidDue)}</small>` : ''}</td><td>${fmtD(e.createdAt)}</td><td>${o ? `<span class="dot ${ageColor(e)}"></span>${estAge(e)} d` : '—'}</td><td class="num">${money(t.total)}</td><td>${badge(e.status)}</td></tr>`; }).join('') || `<tr><td colspan="7">${empty('No proposals match', 'Change the filters or create a new estimate')}</td></tr>`}</table></div>
+    <span class="grow"></span><b>${list.length} shown · ${money(list.reduce((a, e) => a + estTotals(e).total, 0))}${list.some(e => sealSY(e)) ? ' · ' + fmtSY(list.reduce((a, e) => a + sealSY(e), 0)) + ' sealcoat' : ''}</b></div>
+  ${filtBarHTML(estF, 'ef', 'Total')}
+  <div class="card flush"><table class="hover"><tr><th>#</th><th>Project</th><th>Customer</th><th>Proposal date</th><th>Age</th><th class="num">Sealcoat SY</th><th class="num">Total</th><th>Status</th></tr>
+  ${list.map(e => { const t = estTotals(e), o = isOpenEst(e); return `<tr class="${o ? 'age-' + ageColor(e) : ''}" onclick="location.hash='#/estimates/${e.id}'"><td>${e.number}</td><td><b>${esc(e.title)}</b>${sealStar(hasSealcoat(e))}<br><small>${esc(e.address)}</small></td><td>${esc(estCustLabel(e))}${e.bidDue && o ? `<br><small class="${dueClass(e.bidDue)}">bid due ${fmtShort(e.bidDue)}</small>` : ''}</td><td>${fmtD(e.createdAt)}</td><td>${o ? `<span class="dot ${ageColor(e)}"></span>${estAge(e)} d` : '—'}</td><td class="num">${sealSY(e) ? Math.round(sealSY(e)).toLocaleString('en-US') : ''}</td><td class="num">${money(t.total)}</td><td>${badge(e.status)}</td></tr>`; }).join('') || `<tr><td colspan="8">${empty('No proposals match', 'Change the filters or create a new estimate')}</td></tr>`}</table></div>
   <p class="hint">Open proposals are colored by proposal date: green = last 90 days, yellow = 90–180 days, red = older than 180 days.</p>`,
-    mount() { $('#estFrom').onchange = e => { estFrom = e.target.value; render(); }; $('#estTo').onchange = e => { estTo = e.target.value; render(); }; }
+    mount() { filtMount(estF, 'ef'); $('#estFrom').onchange = e => { estFrom = e.target.value; render(); }; $('#estTo').onchange = e => { estTo = e.target.value; render(); }; }
   };
 };
 ACT.estFilter = el => { estFilter = el.dataset.v; render(); };
 let estShown = [], estShownTab = 'all';
-ACT.exportEstimates = () => downloadCSV('proposals-' + estShownTab, ['#', 'Project', 'Customer', 'Location', 'Proposal date', 'Age (days)', 'Status', 'Sealcoating', 'Sealcoat SY', 'Total price'], estShown.map(e => [e.number, e.title, estCustLabel(e), e.address || '', e.createdAt || '', estAge(e), e.status, hasSealcoat(e) ? 'Yes' : 'No', sealSY(e) || '', estTotals(e).total]), ['Total price']);
+ACT.exportEstimates = () => downloadCSV('proposals-' + estShownTab, ['#', 'Project', 'Customer', 'Location', 'Proposal date', 'Age (days)', 'Status', 'Sealcoating', 'Sealcoat SY', 'Total price'], estShown.map(e => [e.number, e.title, estCustLabel(e), e.address || '', e.createdAt || '', estAge(e), e.status, hasSealcoat(e) ? 'Yes' : 'No', sealSY(e) || '', estTotals(e).total]), ['Sealcoat SY', 'Total price']);
 ACT.estColor = el => { estColor = el.dataset.v; render(); };
-ACT.estClear = () => { estColor = 'all'; estFrom = estTo = ''; render(); };
+ACT.estClear = () => { estColor = 'all'; estFrom = estTo = ''; Object.assign(estF, mkFilt()); render(); };
 ACT.newEstimate = () => {
   if (!DB.customers.length) return toast('Add a customer first', 'err');
   openForm({
