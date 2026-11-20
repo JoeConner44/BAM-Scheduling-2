@@ -107,7 +107,10 @@ function hasSealcoat(e) {
   return SEAL_RE.test(text.replace(SEAL_NEG, ' '));      // ignore mentions that say it was NOT proposed
 }
 const jobSealcoat = j => { const e = j && DB.estimates.find(x => x.id === j.estimateId); return e ? hasSealcoat(e) : SEAL_RE.test((j && j.name) || ''); };
-const sealStar = on => on ? '<span class="star" title="Sealcoating was proposed">★</span>' : '';
+const sealSY = e => e && hasSealcoat(e) ? +e.sealSY || 0 : 0;   // square yards of sealcoat proposed (0 = not recorded)
+const jobSealSY = j => sealSY(j && DB.estimates.find(x => x.id === j.estimateId));
+const fmtSY = n => Math.round(n).toLocaleString('en-US') + ' SY';
+const sealStar = (on, sy) => on ? `<span class="star" title="Sealcoating was proposed${sy ? ' — ' + fmtSY(sy) : ''}">★${sy ? ` <small>${fmtSY(sy)}</small>` : ''}</span>` : '';
 const byId = (coll, id) => DB[coll].find(x => x.id === id);
 const custName = id => (byId('customers', id) || { name: '(deleted)' }).name;
 const nextNum = k => ++DB.seq[k];
