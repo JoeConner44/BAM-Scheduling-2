@@ -253,7 +253,8 @@ ACT.clearData = () => confirmBox('Delete ALL data and start with an empty compan
 
 /* ---------- bulk import of customers / proposals / jobs (merge only: never overwrites or duplicates) ----------
    File: { asphaltproImport: 1, settings?: {...}, projects: [{ key, customer, title, city, state, total, proposalDate,
-           signedDate, status: draft|sent|signed|declined, job?: { status, date, completedAt }, lines?: [], notes?, driveUrl? }] } */
+           signedDate, status: draft|sent|signed|declined, job?: { status, date, completedAt }, lines?: [], notes?, driveUrl?,
+           sealcoat?: true|false, sealSY?: number }], sealcoat?: [key], noSealcoat?: [key], sealcoatSY?: { key: sy } } */
 const normName = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 function previewProjectImport(f) {
   if (!f || f.asphaltproImport !== 1) return toast('Not a valid projects file', 'err');
@@ -285,6 +286,8 @@ function applyProjectImport(projects, settings) {
       lines: (p.lines || []).map(l => ({ id: uid('l'), desc: l.desc || '', note: l.note || '', qty: l.qty ?? '', unit: l.unit || '', price: l.price ?? '' })),
       lumpSum: blank(p.total) ? null : +p.total, hidePrices: true, signature: null, autoRan: true, importKey: p.key, driveUrl: p.driveUrl || '', notes: p.notes || ''
     };
+    if (p.sealcoat === true || p.sealcoat === false) e.sealcoat = p.sealcoat;
+    if (+p.sealSY > 0) e.sealSY = +p.sealSY;
     DB.estimates.push(e);
     if (p.job) {
       const j = makeJob(e); Object.assign(j, { status: p.job.status || 'unscheduled', date: p.job.date || p.job.completedAt || null, completedAt: p.job.completedAt || null, notes: p.notes || '', budget: { material: 0, labor: 0, equipment: 0, other: 0 } });
